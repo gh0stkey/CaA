@@ -1,0 +1,32 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+compileJava {
+    options.encoding = "UTF-8"
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir './src/main/java'
+        }
+    }
+}
+
+task fatJar(type: Jar) {
+    baseName = project.name + '-all'
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
+
+dependencies {
+    compile 'net.portswigger.burp.extender:burp-extender-api:1.7.13'
+    compile 'com.google.code.gson:gson:2.8.9'
+    compile 'org.jetbrains:annotations:16.0.2'
+    compile 'mysql:mysql-connector-java:8.0.27'
+}
