@@ -61,8 +61,6 @@ public class MainUI extends JPanel {
 
     /**
      * 连接按钮
-     *
-     * @param e
      */
     private void connectButtonActionPerformed(ActionEvent e) {
 
@@ -94,12 +92,7 @@ public class MainUI extends JPanel {
                     es.printStackTrace();
                 }
             }
-            String state = map.get("state");
-            state = (state == null) ? "false" : state;
-            if (state.equals("false")) {
-                ProcessDB.initDB(db);
-                map.put("state", "true");
-            }
+            ProcessDB.initDB(db);
             // 就写入配置文件
             ProcessJson.writeJson(map);
             controlSwitch(false);
