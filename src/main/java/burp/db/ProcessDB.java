@@ -1,6 +1,7 @@
 package burp.db;
 
 import burp.Config;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -158,4 +159,5 @@ public class ProcessDB {
             e.printStackTrace();
         }
     }
+
 }

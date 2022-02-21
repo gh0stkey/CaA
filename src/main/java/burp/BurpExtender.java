@@ -5,10 +5,13 @@ import burp.json.ProcessJson;
 import burp.ui.MainUI;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import java.awt.Component;
+
+import javax.swing.*;
+import java.awt.*;
+import java.io.File;
 import java.io.PrintWriter;
 import java.util.List;
-import javax.swing.SwingUtilities;
+import java.util.Map;
 
 /**
  * @author EvilChen
@@ -25,18 +28,31 @@ public class BurpExtender implements IBurpExtender, ITab, IScannerCheck {
     public void registerExtenderCallbacks(IBurpExtenderCallbacks callbacks) {
         this.callbacks = callbacks;
         BurpExtender.helpers = callbacks.getHelpers();
-        String version = "0.2";
+        String version = "0.3";
         callbacks.setExtensionName(String.format("CaA (%s) - Collector and Analyzer", version));
         callbacks.registerScannerCheck(BurpExtender.this);
 
         // 定义输出
         stdout = new PrintWriter(callbacks.getStdout(), true);
         stdout.println("@Core Author: EvilChen");
-        stdout.println("@UI Author: 0chencc");
+        stdout.println("@Architecture Author: 0chencc");
         stdout.println("@Github: https://github.com/gh0stkey/CaA");
+
+        // 自动连接数据库
+        File configFile = new File(Config.CaAConfig);
+        if (configFile.isFile() && configFile.exists()) {
+            Map<String, String> configMap = ProcessJson.parseJson();
+            String host = configMap.get("host");
+            String port = configMap.get("port");
+            String user = configMap.get("username");
+            String pwd = configMap.get("password");
+            String db = configMap.get("database");
+            MainUI.processConnect(host, port, user, pwd, db);
+        }
 
         // UI
         SwingUtilities.invokeLater(this::initialize);
+
     }
 
     private void initialize() {
@@ -147,7 +163,7 @@ public class BurpExtender implements IBurpExtender, ITab, IScannerCheck {
 
     @Override
     public List<IScanIssue> doActiveScan(IHttpRequestResponse baseRequestResponse,
-            IScannerInsertionPoint insertionPoint) {
+                                         IScannerInsertionPoint insertionPoint) {
         return null;
     }
 

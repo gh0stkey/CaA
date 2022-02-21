@@ -7,9 +7,13 @@ package burp.ui;
 import burp.Config;
 import burp.db.ProcessDB;
 import burp.json.ProcessJson;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+
+import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -19,21 +23,6 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Vector;
-import javax.swing.DefaultComboBoxModel;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
-import javax.swing.JTable;
-import javax.swing.JTextField;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.table.JTableHeader;
 
 /**
  * @author 0chencc && EvilChen
@@ -48,7 +37,7 @@ public class MainUI extends JPanel {
     /**
      * 按钮/输入框开关函数
      */
-    private void controlSwitch(boolean state) {
+    private static void controlSwitch(boolean state) {
         connectButton.setEnabled(state);
         hostInput.setEditable(state);
         portInput.setEditable(state);
@@ -63,13 +52,15 @@ public class MainUI extends JPanel {
      * 连接按钮
      */
     private void connectButtonActionPerformed(ActionEvent e) {
-
         String host = hostInput.getText();
         String port = portInput.getText();
         String user = userInput.getText();
         String pwd = pwdInput.getText();
         String db = dbInput.getText();
+        processConnect(host, port, user, pwd, db);
+    }
 
+    public static void processConnect(String host, String port, String user, String pwd, String db) {
         Config.setConn(host, port, user, pwd, db);
 
         File configFile = new File(Config.CaAConfig);
@@ -553,22 +544,22 @@ public class MainUI extends JPanel {
     private JPanel ConfigPanel;
     private JPanel panel1;
     private JLabel label4;
-    private JTextField hostInput;
+    private static JTextField hostInput;
     private JPanel panel2;
     private JLabel label5;
-    private JTextField portInput;
+    private static JTextField portInput;
     private JPanel panel3;
     private JLabel label6;
-    private JTextField userInput;
+    private static JTextField userInput;
     private JPanel panel4;
     private JLabel label7;
-    private JTextField pwdInput;
+    private static JTextField pwdInput;
     private JPanel panel5;
     private JLabel label8;
-    private JTextField dbInput;
+    private static JTextField dbInput;
     private JPanel panel6;
-    private JButton connectButton;
-    private JButton disConnectButton;
+    private static JButton connectButton;
+    private static JButton disConnectButton;
     private JPanel QueryPanel;
     private JPanel panel7;
     private JCheckBox conditionCheckBox;
@@ -576,7 +567,7 @@ public class MainUI extends JPanel {
     private JComboBox<String> tableComboBox;
     private JLabel limitLabel;
     private JTextField limitCountInput;
-    private JButton queryButton;
+    private static JButton queryButton;
     private JPanel showPanel;
     private JLabel label1;
     private JCheckBox idCheckBox;
