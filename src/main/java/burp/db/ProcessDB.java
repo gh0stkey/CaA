@@ -70,9 +70,9 @@ public class ProcessDB {
                 psSql = conn.prepareStatement(sql);
                 psSql.setInt(1, Integer.parseInt(limit));
             } else {
-                sql = String.format(sql, "where host = ?");
+                sql = String.format(sql, "where host like ?");
                 psSql = conn.prepareStatement(sql);
-                psSql.setString(1, host);
+                psSql.setString(1, "%" + host + "%"); // 模糊匹配
                 psSql.setInt(2, Integer.parseInt(limit));
             }
             resultSet = psSql.executeQuery();
