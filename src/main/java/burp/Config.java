@@ -11,7 +11,10 @@ import java.sql.SQLException;
 public class Config {
 
     // CaA配置文件路径
-    public static String CaAConfig = "CaA-Config.json";
+
+
+    public static String CaAPath = String.format("%s/.config/CaA", System.getProperty("user.home"));
+    public static String CaAConfigPath = String.format("%s/%s", CaAPath, "Config.json");
 
     // 数据库连接状态
     public static boolean isConnect = false;

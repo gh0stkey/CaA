@@ -63,7 +63,13 @@ public class MainUI extends JPanel {
     public static void processConnect(String host, String port, String user, String pwd, String db) {
         Config.setConn(host, port, user, pwd, db);
 
-        File configFile = new File(Config.CaAConfig);
+
+        File CaAConfigPathFile = new File(Config.CaAPath);
+        if (!(CaAConfigPathFile.exists() && CaAConfigPathFile.isDirectory())) {
+            CaAConfigPathFile.mkdirs();
+        }
+
+        File configFile = new File(Config.CaAConfigPath);
         Map<String, String> map = new HashMap<>();
 
         map.put("host", host);
@@ -528,7 +534,7 @@ public class MainUI extends JPanel {
         // JFormDesigner - End of component initialization  //GEN-END:initComponents
 
         // 当配置文件存在时读取内容
-        File configFile = new File(Config.CaAConfig);
+        File configFile = new File(Config.CaAConfigPath);
         if (configFile.isFile() && configFile.exists()) {
             Map<String, String> configMap = ProcessJson.parseJson();
             hostInput.setText(configMap.get("host"));

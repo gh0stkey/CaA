@@ -6,12 +6,8 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.reflect.TypeToken;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +50,7 @@ public class ProcessJson {
     public static Map<String, String> parseJson() {
         BufferedReader configReader = null;
         try {
-            configReader = new BufferedReader(new FileReader(Config.CaAConfig));
+            configReader = new BufferedReader(new FileReader(Config.CaAConfigPath));
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -71,7 +67,7 @@ public class ProcessJson {
     public static void writeJson(Map<String, String> map) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(Config.CaAConfig));
+            BufferedWriter writer = new BufferedWriter(new FileWriter(Config.CaAConfigPath));
             writer.write(gson.toJson(map));
             writer.flush();
         } catch (IOException e) {

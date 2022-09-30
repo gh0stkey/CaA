@@ -31,7 +31,7 @@ public class BurpExtender implements IBurpExtender, ITab, IScannerCheck {
     public void registerExtenderCallbacks(IBurpExtenderCallbacks callbacks) {
         this.callbacks = callbacks;
         BurpExtender.helpers = callbacks.getHelpers();
-        String version = "0.4";
+        String version = "0.5";
         callbacks.setExtensionName(String.format("CaA (%s) - Collector and Analyzer", version));
         callbacks.registerScannerCheck(BurpExtender.this);
 
@@ -42,7 +42,7 @@ public class BurpExtender implements IBurpExtender, ITab, IScannerCheck {
         stdout.println("@Github: https://github.com/gh0stkey/CaA");
 
         // 自动连接数据库
-        File configFile = new File(Config.CaAConfig);
+        File configFile = new File(Config.CaAConfigPath);
         if (configFile.isFile() && configFile.exists()) {
             Map<String, String> configMap = ProcessJson.parseJson();
             String host = configMap.get("host");
