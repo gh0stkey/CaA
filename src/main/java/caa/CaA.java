@@ -17,7 +17,7 @@ public class CaA implements BurpExtension {
     @Override
     public void initialize(MontoyaApi api) {
         // 设置扩展名称
-        String version = "1.0";
+        String version = "Beta 0.8";
         Database db = null;
         MessageTableModel messageTableModel = new MessageTableModel(api);
         api.extension().setName(String.format("CaA (%s) - Collector and Analyzer", version));
