@@ -19,17 +19,25 @@ public class Database {
         try {
             Class.forName("org.sqlite.JDBC");
             this.connection = DriverManager.getConnection(String.format("jdbc:sqlite:%s", dbFileName));
-            // 初始化表
-            createTables();
-        } catch (Exception e) {
-            api.logging().logToError(e);
-        }
-    }
+            Statement statement = this.connection.createStatement();
 
-    private void executeSql(String sql) {
-        try {
-            Statement stmt = connection.createStatement();
-            stmt.execute(sql);
+            // 开启 WAL 模式
+            statement.executeUpdate("PRAGMA journal_mode=WAL;");
+
+            // 修改分页大小
+            statement.executeUpdate("PRAGMA page_size = 8192;");
+
+            // 开启自动检查点模式
+            statement.executeUpdate("PRAGMA wal_autocheckpoint = 2000;");
+
+            // 关闭同步模式
+            statement.executeUpdate("PRAGMA synchronous=OFF;");
+
+            // 启用缓存
+            statement.executeUpdate("PRAGMA cache_size = 10000;");
+
+            // 初始化数据表
+            createTables();
         } catch (Exception e) {
             api.logging().logToError(e);
         }
@@ -37,57 +45,59 @@ public class Database {
 
     public Object selectData(String host, String tableName, String limitSize) {
         try {
-            String sql = "select name%s from `" + tableName + "` %s order by count desc";
-            if (!limitSize.isBlank()) {
-                sql += " limit " + limitSize;
-            }
-            if (tableName.contains("All")) {
-                sql = String.format(sql, "", "");
-            } else if (tableName.equals("Value")){
-                sql = String.format(sql, ",value", "where host = ?");
-            } else {
-                sql = String.format(sql, "", "where host = ?");
-            }
-
-            PreparedStatement ps = connection.prepareStatement(sql);
-            prepareStatement(host, ps);
-            ResultSet rs = ps.executeQuery();
-
-            // 判断结果集是否为空
-            if (!rs.isBeforeFirst()) {
-                return null;
-            } else {
-                if (tableName.equals("Value")) {
-                    SetMultimap<String, String> multimap = LinkedHashMultimap.create();
-                    while (rs.next()){
-                        String key = rs.getString(1);
-                        String value = rs.getString(2);
-                        multimap.put(key, value);
-                    }
-                    if (multimap.size() <= 0) {
-                        return null;
-                    }
-                    return multimap;
+            if (!connection.isClosed()) {
+                String sql = "select name%s from `" + tableName + "` %s order by count desc";
+                if (!limitSize.isBlank()) {
+                    sql += " limit " + limitSize;
+                }
+                if (tableName.contains("All")) {
+                    sql = String.format(sql, "", "");
+                } else if (tableName.equals("Value")){
+                    sql = String.format(sql, ",value", "where host = ?");
                 } else {
-                    Set<String> resultList = new HashSet<>();
-                    while (rs.next()){
-                        String columnValue = rs.getString(1);
-                        resultList.add(columnValue);
+                    sql = String.format(sql, "", "where host = ?");
+                }
+
+                PreparedStatement ps = connection.prepareStatement(sql);
+                prepareStatement(host, ps);
+                ResultSet rs = ps.executeQuery();
+
+                // 判断结果集是否为空
+                if (!rs.isBeforeFirst()) {
+                    return null;
+                } else {
+                    if (tableName.equals("Value")) {
+                        SetMultimap<String, String> multimap = LinkedHashMultimap.create();
+                        while (rs.next()){
+                            String key = rs.getString(1);
+                            String value = rs.getString(2);
+                            multimap.put(key, value);
+                        }
+                        if (multimap.size() <= 0) {
+                            return null;
+                        }
+                        return multimap;
+                    } else {
+                        Set<String> resultList = new LinkedHashSet<>();
+                        while (rs.next()){
+                            String columnValue = rs.getString(1);
+                            resultList.add(columnValue);
+                        }
+                        if (resultList.isEmpty()) {
+                            return null;
+                        }
+                        return resultList;
                     }
-                    if (resultList.isEmpty()) {
-                        return null;
-                    }
-                    return resultList;
                 }
             }
         } catch (Exception e) {
             api.logging().logToError(e);
-            return null;
         }
 
+        return null;
     }
 
-    public void createTables() {
+    private void createTables() {
         String sqlTemplate = """
                 CREATE TABLE IF NOT EXISTS `%s` (
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,8 +119,12 @@ public class Database {
             } else {
                 uniqueField = ", UNIQUE(name)";
             }
-            String sql = String.format(sqlTemplate, name, fields, uniqueField);
-            executeSql(sql);
+            try {
+                Statement stmt = connection.createStatement();
+                stmt.execute(String.format(sqlTemplate, name, fields, uniqueField));
+            } catch (Exception e) {
+                api.logging().logToError(e);
+            }
         }
     }
 

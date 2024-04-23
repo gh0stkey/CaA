@@ -17,6 +17,8 @@ import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.*;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -37,6 +39,15 @@ public class FuzzerDialog extends JDialog {
     private final String payload;
     private final boolean secure;
     private final Dimension dialogDimension = new Dimension(888, 688);
+    private final JPopupMenu popupMenu;
+
+    private final MouseAdapter mouseAdapter = new MouseAdapter() {
+        public void mouseReleased(MouseEvent e) {
+            if (SwingUtilities.isRightMouseButton(e)) {
+                popupMenu.show(e.getComponent(), e.getX(), e.getY());
+            }
+        }
+    };
 
     public FuzzerDialog(MontoyaApi api, Database db, MessageTableModel messageTableModel, String httpRequest, boolean secure, String tabName, String payload) {
         this.api = api;
@@ -48,6 +59,8 @@ public class FuzzerDialog extends JDialog {
         this.secure = secure;
 
         contentPanel = new JPanel(new BorderLayout());
+        popupMenu = new JPopupMenu();
+
         initComponents();
 
         setTitle("Fuzzer - Task Configuration");
@@ -145,13 +158,32 @@ public class FuzzerDialog extends JDialog {
         JComboBox<String> fuzzModeComboBox = new JComboBox<>();
         String[] mode = new String[] {"Param", "File", "Path", "Value"};
         fuzzModeComboBox.setModel(new DefaultComboBoxModel<>(mode));
+
+        // Value 修改Name快捷方式
+
+        JMenuItem renameMenuItem = new JMenuItem("Rename");
+        popupMenu.add(renameMenuItem);
+        renameMenuItem.addActionListener(e -> {
+            int[] selectedRows = table.getSelectedRows();
+            String newName = JOptionPane.showInputDialog("Please enter the new name.");
+            if (!newName.isBlank()) {
+                for (int row : selectedRows) {
+                    int columnIndex = 0;
+                    table.getModel().setValueAt(newName, row, columnIndex);
+                }
+            }
+        });
+
         fuzzModeComboBox.addActionListener(e -> {
             String selected = (String) fuzzModeComboBox.getSelectedItem();
             if (selected.equals("Value")) {
                 model.addColumn("Value");
                 model.setColumnCount(2);
+
+                table.addMouseListener(mouseAdapter);
             } else {
                 model.setColumnCount(1);
+                table.removeMouseListener(mouseAdapter);
             }
             addDataToTable(payload, model);
         });

@@ -2,6 +2,7 @@ package caa;
 
 import burp.api.montoya.BurpExtension;
 import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.extension.ExtensionUnloadingHandler;
 import burp.api.montoya.logging.Logging;
 import caa.component.CaAMain;
 import caa.component.member.taskboard.MessageTableModel;
@@ -12,12 +13,13 @@ import caa.instances.Database;
 
 import java.io.File;
 import java.sql.Connection;
+import java.sql.SQLException;
 
 public class CaA implements BurpExtension {
     @Override
     public void initialize(MontoyaApi api) {
         // 设置扩展名称
-        String version = "Beta 0.8";
+        String version = "Beta 0.9";
         Database db = null;
         MessageTableModel messageTableModel = new MessageTableModel(api);
         api.extension().setName(String.format("CaA (%s) - Collector and Analyzer", version));
@@ -59,5 +61,19 @@ public class CaA implements BurpExtension {
             api.logging().logToOutput("[Error] Failed to connect to the CaA database!");
             api.extension().unload();
         }
+
+        api.extension().registerUnloadingHandler(new ExtensionUnloadingHandler() {
+            @Override
+            public void extensionUnloaded() {
+                try {
+                    if (con != null) {
+                        con.close();
+                    }
+                } catch (Exception ignored) {
+                }
+
+            }
+        });
+
     }
 }
