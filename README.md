@@ -9,6 +9,10 @@
 
 **CaA**是一个基于`BurpSuite Java插件API`开发的流量收集和分析插件。它的主要作用就是收集HTTP协议报文中的参数、路径、文件、参数值等信息，并统计出现的频次，为使用者积累真正具有实战意义的Fuzzing字典。除此之外，CaA还提供了独立的Fuzzing功能，可以根据用户输入的字典，以不同的请求方式交叉遍历请求，从而帮助用户发现隐藏的参数、路径、文件，以便于进一步发现安全漏洞。
 
+**所获荣誉**:
+
+1. [入选2024年KCon兵器谱](https://mp.weixin.qq.com/s/H7QLItrMw-aaqL2-CAvBTg)
+
 ## 使用方法
 
 插件装载: `Extender - Extensions - Add - Select File - Next`。
