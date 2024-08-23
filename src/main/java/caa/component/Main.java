@@ -1,33 +1,33 @@
 package caa.component;
 
-import javax.swing.*;
 import burp.api.montoya.MontoyaApi;
-import caa.component.member.taskboard.MessageTableModel;
 import caa.component.utils.UITools;
 import caa.instances.Database;
+import caa.utils.ConfigLoader;
 
+import javax.swing.*;
 import java.awt.*;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 
-public class CaAMain extends JPanel {
+public class Main extends JPanel {
     private final MontoyaApi api;
     private final Database db;
-    private final MessageTableModel messageTableModel;
+    private final ConfigLoader configLoader;
 
-    public CaAMain(MontoyaApi api, Database db, MessageTableModel messageTableModel) {
+    public Main(MontoyaApi api, Database db, ConfigLoader configLoader) {
         this.api = api;
         this.db = db;
-        this.messageTableModel = messageTableModel;
+        this.configLoader = configLoader;
         initComponents();
     }
 
     private void initComponents() {
         setLayout(new GridBagLayout());
-        ((GridBagLayout)getLayout()).columnWidths = new int[] {0, 0};
-        ((GridBagLayout)getLayout()).rowHeights = new int[] {0, 0};
-        ((GridBagLayout)getLayout()).columnWeights = new double[] {1.0, 1.0E-4};
-        ((GridBagLayout)getLayout()).rowWeights = new double[] {1.0, 1.0E-4};
+        ((GridBagLayout) getLayout()).columnWidths = new int[]{0, 0};
+        ((GridBagLayout) getLayout()).rowHeights = new int[]{0, 0};
+        ((GridBagLayout) getLayout()).columnWeights = new double[]{1.0, 1.0E-4};
+        ((GridBagLayout) getLayout()).rowWeights = new double[]{1.0, 1.0E-4};
 
         JTabbedPane mainTabbedPane = new JTabbedPane();
 
@@ -59,7 +59,7 @@ public class CaAMain extends JPanel {
                 GridBagConstraints.CENTER, GridBagConstraints.BOTH,
                 new Insets(0, 0, 0, 0), 0, 0));
 
-        mainTabbedPane.addTab("Databoard", new Databoard(api, db, messageTableModel));
-        mainTabbedPane.addTab("Taskboard", new Taskboard(api, messageTableModel));
+        mainTabbedPane.addTab("Databoard", new Databoard(api, db));
+        mainTabbedPane.addTab("Config", new Config(api, configLoader));
     }
 }

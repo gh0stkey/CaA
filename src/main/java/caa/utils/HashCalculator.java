@@ -1,14 +1,13 @@
 package caa.utils;
 
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 /**
  * @author EvilChen
  */
 
 public class HashCalculator {
-    public static String calculateHash(byte[] bytes){
+    public static String calculateHash(byte[] bytes) {
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("MD5");

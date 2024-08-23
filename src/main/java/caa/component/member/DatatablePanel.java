@@ -1,28 +1,27 @@
 package caa.component.member;
 
-import java.awt.*;
-import java.awt.datatransfer.Clipboard;
-import java.awt.datatransfer.StringSelection;
-import java.awt.event.*;
-
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.requests.HttpRequest;
-
 import caa.component.utils.UITools;
-import caa.component.member.taskboard.MessageTableModel;
 import caa.instances.Database;
+import caa.instances.Generator;
 import com.google.common.collect.SetMultimap;
-import jregex.Pattern;
-import jregex.REFlags;
 
-import java.util.*;
-import java.util.List;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
+import java.awt.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.regex.Pattern;
 
 public class DatatablePanel extends JPanel {
     private final JTable dataTable;
@@ -35,17 +34,17 @@ public class DatatablePanel extends JPanel {
     private final Object dataObj;
     private final int columnSize;
     private final HttpRequest httpRequest;
-    private final MessageTableModel messageTableModel;
     private final Database db;
+    private final Generator generator;
 
-    public DatatablePanel(MontoyaApi api, Database db, MessageTableModel messageTableModel, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName) {
+    public DatatablePanel(MontoyaApi api, Database db, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName) {
         this.api = api;
         this.db = db;
-        this.messageTableModel = messageTableModel;
         this.tabName = tabName.replace("All ", "");
         this.dataObj = dataObj;
         this.httpRequest = httpRequest;
         this.columnSize = columnNameList.size();
+        this.generator = new Generator(api);
 
         String[] columnNames = new String[columnSize + 1];
         columnNames[0] = "#";
@@ -128,31 +127,57 @@ public class DatatablePanel extends JPanel {
 
         JButton settingsButton = new JButton("Settings");
         settingsButton.addActionListener(e -> {
-            int x = settingsButton.getX();
-            int y = settingsButton.getY() - menu.getPreferredSize().height;
-            menu.show(settingsButton, x, y);
+            Point buttonLocation = settingsButton.getLocationOnScreen();
+            Dimension menuSize = menu.getPreferredSize();
+            int x = buttonLocation.x + (settingsButton.getWidth() - menuSize.width) / 2;
+            int y = buttonLocation.y - menuSize.height;
+            menu.show(settingsButton, x - buttonLocation.x, y - buttonLocation.y);
         });
 
         optionsPanel.add(settingsButton);
         optionsPanel.add(Box.createHorizontalStrut(5));
         optionsPanel.add(searchField);
 
-        // Fuzzer 快捷方式
+        // 右键快捷方式
         JPopupMenu popupMenu = new JPopupMenu();
-        JMenuItem sendToFuzzerMenuItem = new JMenuItem("Send to Fuzzer");
-        popupMenu.add(sendToFuzzerMenuItem);
-        sendToFuzzerMenuItem.addActionListener(e -> {
-            String payload = getSelectedData(dataTable);
-            if (httpRequest != null) {
-                new FuzzerDialog(api, db, messageTableModel, httpRequest.toString().replaceAll("\r\n", "\n"), httpRequest.httpService().secure(), tabName, payload);
-            } else {
-                new FuzzerDialog(api, db, messageTableModel, "", false, tabName, payload);
-            }
+        JMenuItem generatorPayload = new JMenuItem("Generator Payload");
+        JMenu copyMenu = new JMenu("Copy Payload");
+        JMenuItem rawCopy = new JMenuItem("Raw");
+        JMenuItem jsonCopy = new JMenuItem("Json");
+        JMenuItem xmlCopy = new JMenuItem("Xml");
+        copyMenu.add(rawCopy);
+        copyMenu.add(jsonCopy);
+        copyMenu.add(xmlCopy);
+
+        rawCopy.addActionListener(e -> {
+            String payload = getSelectedDataAtTable(dataTable);
+            setClipboardContents(generator.generateRawParam(payload));
+        });
+
+        jsonCopy.addActionListener(e -> {
+            String payload = getSelectedDataAtTable(dataTable);
+            setClipboardContents(generator.generateJsonParam(payload));
+        });
+
+        xmlCopy.addActionListener(e -> {
+            String payload = getSelectedDataAtTable(dataTable);
+            setClipboardContents(generator.generateXmlParam(payload));
+        });
+
+        generatorPayload.addActionListener(e -> {
+            String payload = getSelectedDataAtTable(dataTable);
+            new GeneratorDialog(this, api, db, httpRequest, tabName, payload);
         });
 
         dataTable.addMouseListener(new MouseAdapter() {
             public void mouseReleased(MouseEvent e) {
                 if (SwingUtilities.isRightMouseButton(e)) {
+                    if (tabName.equals("Current") || tabName.equals("Param") || tabName.equals("Value")) {
+                        popupMenu.add(copyMenu);
+                    }
+                    if (httpRequest != null) {
+                        popupMenu.add(generatorPayload);
+                    }
                     popupMenu.show(e.getComponent(), e.getX(), e.getY());
                 }
             }
@@ -162,8 +187,7 @@ public class DatatablePanel extends JPanel {
             @Override
             public void exportToClipboard(JComponent comp, Clipboard clip, int action) throws IllegalStateException {
                 if (comp instanceof JTable) {
-                    StringSelection stringSelection = new StringSelection(getSelectedData(
-                            (JTable) comp));
+                    StringSelection stringSelection = new StringSelection(getSelectedDataAtTable((JTable) comp).replace("\0", "").replaceAll("[\\p{Cntrl}&&[^\r\n\t]]", ""));
                     clip.setContents(stringSelection, null);
                 } else {
                     super.exportToClipboard(comp, clip, action);
@@ -173,6 +197,12 @@ public class DatatablePanel extends JPanel {
 
         add(scrollPane, BorderLayout.CENTER);
         add(optionsPanel, BorderLayout.SOUTH);
+    }
+
+    private void setClipboardContents(String contents) {
+        StringSelection stringSelection = new StringSelection(contents);
+        Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+        clipboard.setContents(stringSelection, null);
     }
 
     private void addRowToTable(Object[] data) {
@@ -191,7 +221,7 @@ public class DatatablePanel extends JPanel {
                     String searchFieldTextText = searchField.getText();
                     Pattern pattern = null;
                     try {
-                        pattern = new Pattern(searchFieldTextText, REFlags.IGNORE_CASE);
+                        pattern = Pattern.compile(searchFieldTextText, Pattern.CASE_INSENSITIVE);
                     } catch (Exception ignored) {
                     }
 
@@ -208,21 +238,23 @@ public class DatatablePanel extends JPanel {
         }
     }
 
-    public static String getSelectedData(JTable table) {
+    public String getSelectedDataAtTable(JTable table) {
         int[] selectRows = table.getSelectedRows();
         StringBuilder selectData = new StringBuilder();
+
         for (int row : selectRows) {
             int columnCount = table.getColumnCount();
             switch (columnCount) {
-                case 2 -> selectData.append(table.getValueAt(row, 1).toString()).append("\n");
+                case 2 -> selectData.append(table.getValueAt(row, 1).toString()).append("\r\n");
                 case 3 ->
-                        selectData.append(String.format("%s\t%s", table.getValueAt(row, 1).toString(), table.getValueAt(row, 2).toString())).append("\n");
+                        selectData.append(String.format("%s\t%s", table.getValueAt(row, 1).toString(), table.getValueAt(row, 2).toString())).append("\r\n");
             }
         }
 
-        // 便于单行复制，去除最后一个换行符
-        if (selectData.length() > 0){
-            selectData.deleteCharAt(selectData.length() - 1);
+        if (!selectData.isEmpty()) {
+            selectData.delete(selectData.length() - 2, selectData.length());
+        } else {
+            return "";
         }
 
         return selectData.toString();

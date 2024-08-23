@@ -18,6 +18,9 @@ public class SharedMethod {
             if (collectMap.get("Path") != null) {
                 dataMap.put("All Path", collectMap.get("Path"));
             }
+            if (collectMap.get("FullPath") != null) {
+                dataMap.put("All FullPath", collectMap.get("FullPath"));
+            }
             if (collectMap.get("File") != null) {
                 dataMap.put("All File", collectMap.get("File"));
             }

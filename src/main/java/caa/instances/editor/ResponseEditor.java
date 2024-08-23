@@ -3,7 +3,6 @@ package caa.instances.editor;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.core.ByteArray;
 import burp.api.montoya.core.Range;
-import burp.api.montoya.core.ToolType;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.responses.HttpResponse;
@@ -12,34 +11,37 @@ import burp.api.montoya.ui.editor.extension.EditorCreationContext;
 import burp.api.montoya.ui.editor.extension.ExtensionProvidedHttpResponseEditor;
 import burp.api.montoya.ui.editor.extension.HttpResponseEditorProvider;
 import caa.component.member.DatatablePanel;
-import caa.component.member.taskboard.MessageTableModel;
 import caa.instances.Collector;
 import caa.instances.Database;
+import caa.utils.ConfigLoader;
+import caa.utils.HttpUtils;
 
 import javax.swing.*;
 import javax.swing.event.ChangeListener;
 import java.awt.*;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class ResponseEditor implements HttpResponseEditorProvider {
     private final MontoyaApi api;
     private final Database db;
-    private final MessageTableModel messageTableModel;
+    private final ConfigLoader configLoader;
 
-    public ResponseEditor(MontoyaApi api, Database db, MessageTableModel messageTableModel)
-    {
+    public ResponseEditor(MontoyaApi api, Database db, ConfigLoader configLoader) {
         this.api = api;
         this.db = db;
-        this.messageTableModel = messageTableModel;
+        this.configLoader = configLoader;
     }
 
     @Override
     public ExtensionProvidedHttpResponseEditor provideHttpResponseEditor(EditorCreationContext creationContext) {
-        return new Editor(api, creationContext, db, messageTableModel);
+        return new Editor(api, creationContext, db, configLoader);
     }
 
     private static class Editor implements ExtensionProvidedHttpResponseEditor {
         private final MontoyaApi api;
+        private final ConfigLoader configLoader;
+        private final HttpUtils httpUtils;
         private final JTabbedPane jTabbedPane;
         private final JTabbedPane jTabbedPaneA;
         private DatatablePanel dataPanel;
@@ -47,18 +49,18 @@ public class ResponseEditor implements HttpResponseEditorProvider {
         private final JTabbedPane jTabbedPaneB;
         private final Database db;
         private final EditorCreationContext creationContext;
-        private final MessageTableModel messageTableModel;
         private HttpRequestResponse requestResponse;
+        private LinkedHashMap<String, Object> dataMap;
 
-        public Editor(MontoyaApi api, EditorCreationContext creationContext, Database db, MessageTableModel messageTableModel)
-        {
+        public Editor(MontoyaApi api, EditorCreationContext creationContext, Database db, ConfigLoader configLoader) {
             this.api = api;
             this.db = db;
+            this.configLoader = configLoader;
+            this.httpUtils = new HttpUtils(api, configLoader);
             this.creationContext = creationContext;
             this.jTabbedPane = new JTabbedPane();
             this.jTabbedPaneA = new JTabbedPane();
             this.jTabbedPaneB = new JTabbedPane();
-            this.messageTableModel = messageTableModel;
         }
 
         @Override
@@ -69,27 +71,42 @@ public class ResponseEditor implements HttpResponseEditorProvider {
         @Override
         public void setRequestResponse(HttpRequestResponse requestResponse) {
             this.requestResponse = requestResponse;
+            if (dataMap != null && !dataMap.isEmpty()) {
+                SharedTabBuilder tabBuilder = new SharedTabBuilder(api, db, jTabbedPane, jTabbedPaneA, jTabbedPaneB);
+                dataPanel = tabBuilder.generateTabWithData(dataMap, requestResponse.request());
+            }
         }
 
         @Override
         public synchronized boolean isEnabledFor(HttpRequestResponse requestResponse) {
-            ToolType toolType = creationContext.toolSource().toolType();
-            if (toolType == ToolType.PROXY || toolType == ToolType.REPEATER || toolType == ToolType.INTRUDER || toolType == ToolType.EXTENSIONS) {
-                // 标签页也过一遍收集器
-                Collector collector = new Collector(api, db);
-                collector.passiveAudit(requestResponse);
+            HttpResponse response = requestResponse.response();
 
+            if (response != null) {
                 HttpRequest request = requestResponse.request();
+                boolean matches = false;
 
-                Map<String, Object> collectMap = collector.getDataMap();
-                LinkedHashMap<String, Object> dataMap = SharedMethod.getDataMap(collectMap);
+                if (request != null) {
+                    try {
+                        String host = httpUtils.getHostByUrl(request.url());
+                        if (!host.isEmpty()) {
+                            String toolType = creationContext.toolSource().toolType().toolName();
+                            matches = httpUtils.verifyHttpRequestResponse(requestResponse, toolType);
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
 
-                if (dataMap != null) {
-                    SharedTabBuilder tabBuilder = new SharedTabBuilder(api, db, messageTableModel, jTabbedPane, jTabbedPaneA, jTabbedPaneB);
-                    dataPanel = tabBuilder.generateTabWithData(dataMap, request);
-                    return true;
+                if (!matches) {
+                    Collector collector = new Collector(api, db, configLoader);
+                    collector.passiveAudit(requestResponse);
+
+                    Map<String, Object> collectMap = collector.getDataMap();
+                    dataMap = SharedMethod.getDataMap(collectMap);
+
+                    return dataMap != null && !dataMap.isEmpty();
                 }
             }
+
             return false;
         }
 
@@ -118,7 +135,7 @@ public class ResponseEditor implements HttpResponseEditorProvider {
             return new Selection() {
                 @Override
                 public ByteArray contents() {
-                    return ByteArray.byteArray(dataPanel.getSelectedData(dataTable));
+                    return ByteArray.byteArray(dataPanel.getSelectedDataAtTable(dataTable));
                 }
 
                 @Override

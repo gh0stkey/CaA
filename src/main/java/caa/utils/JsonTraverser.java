@@ -1,15 +1,11 @@
 package caa.utils;
 
-import com.google.common.collect.*;
+import com.google.common.collect.LinkedHashMultimap;
+import com.google.common.collect.SetMultimap;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.LinkedHashSet;
-import java.util.Set;
-import java.util.Map;
-import java.util.Collection;
+import java.util.*;
 
 public class JsonTraverser {
     private final Set<String> jsonKeys;
@@ -47,9 +43,9 @@ public class JsonTraverser {
     private void processJsonValue(String key, JsonElement value, Deque<JsonElement> stack) {
         if (value.isJsonObject() || value.isJsonArray()) {
             stack.push(value);
-            if(value.isJsonArray()){
-                for(JsonElement arrayElement : value.getAsJsonArray()) {
-                    if(!(arrayElement.isJsonObject() || arrayElement.isJsonArray())){
+            if (value.isJsonArray()) {
+                for (JsonElement arrayElement : value.getAsJsonArray()) {
+                    if (!(arrayElement.isJsonObject() || arrayElement.isJsonArray())) {
                         jsonKeyValues.put(key, arrayElement.getAsString());
                     }
                 }

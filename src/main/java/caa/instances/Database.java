@@ -1,21 +1,19 @@
 package caa.instances;
 
-import java.sql.*;
-import java.util.*;
-
 import burp.api.montoya.MontoyaApi;
 import caa.Config;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
 
+import java.sql.*;
+import java.util.*;
+
 public class Database {
     private final MontoyaApi api;
-    private final String dbFileName;
     private Connection connection = null;
 
     public Database(MontoyaApi api, String dbFileName) {
         this.api = api;
-        this.dbFileName = dbFileName;
         try {
             Class.forName("org.sqlite.JDBC");
             this.connection = DriverManager.getConnection(String.format("jdbc:sqlite:%s", dbFileName));
@@ -36,6 +34,18 @@ public class Database {
             // 启用缓存
             statement.executeUpdate("PRAGMA cache_size = 10000;");
 
+            // 设置临时表存储在内存中
+            statement.executeUpdate("PRAGMA temp_store = MEMORY;");
+
+            // 禁用安全删除
+            statement.executeUpdate("PRAGMA secure_delete = OFF;");
+
+            // 禁用外键约束
+            statement.executeUpdate("PRAGMA foreign_keys = OFF;");
+
+            // 优化数据库
+            statement.executeUpdate("PRAGMA optimize;");
+
             // 初始化数据表
             createTables();
         } catch (Exception e) {
@@ -52,7 +62,7 @@ public class Database {
                 }
                 if (tableName.contains("All")) {
                     sql = String.format(sql, "", "");
-                } else if (tableName.equals("Value")){
+                } else if (tableName.equals("Value")) {
                     sql = String.format(sql, ",value", "where host = ?");
                 } else {
                     sql = String.format(sql, "", "where host = ?");
@@ -68,7 +78,7 @@ public class Database {
                 } else {
                     if (tableName.equals("Value")) {
                         SetMultimap<String, String> multimap = LinkedHashMultimap.create();
-                        while (rs.next()){
+                        while (rs.next()) {
                             String key = rs.getString(1);
                             String value = rs.getString(2);
                             multimap.put(key, value);
@@ -79,7 +89,7 @@ public class Database {
                         return multimap;
                     } else {
                         Set<String> resultList = new LinkedHashSet<>();
-                        while (rs.next()){
+                        while (rs.next()) {
                             String columnValue = rs.getString(1);
                             resultList.add(columnValue);
                         }
@@ -128,6 +138,24 @@ public class Database {
         }
     }
 
+    public List<String> getAllHosts(String tableName) {
+        Set<String> setHostList = new HashSet<>();
+        if (Arrays.stream(Config.CaATableName).anyMatch(t -> t.equalsIgnoreCase(tableName))) {
+            try {
+                Statement stmt = connection.createStatement();
+                ResultSet rs = stmt.executeQuery(String.format("SELECT host FROM `%s` WHERE host IS NOT NULL", tableName));
+
+                while (rs.next()) {
+                    String host = rs.getString("host");
+                    setHostList.add(host);
+                }
+            } catch (SQLException e) {
+                api.logging().logToError(e);
+            }
+        }
+        return new ArrayList<>(setHostList);
+    }
+
     public void insertData(String host, Map<String, Object> dataObj) {
         try {
             connection.setAutoCommit(false);
@@ -158,14 +186,14 @@ public class Database {
             });
             connection.commit();
         } catch (Exception e) {
-            if (connection != null ) {
+            if (connection != null) {
                 try {
                     connection.rollback();
-                } catch (SQLException ignored){
+                } catch (SQLException ignored) {
                 }
             }
         } finally {
-            if (connection != null ) {
+            if (connection != null) {
                 try {
                     connection.setAutoCommit(true);
                 } catch (SQLException ignored) {
@@ -207,7 +235,7 @@ public class Database {
             if (tableName.equals("Value") && !isHostBlank) {
                 LinkedList<String> list = (LinkedList<String>) dataObj;
                 dataObj = new Object[]{list.get(0), list.get(1), host};
-            } else if (tableName.contains("All")){
+            } else if (tableName.contains("All")) {
                 dataObj = new Object[]{dataObj};
             } else if (!isHostBlank) {
                 dataObj = new Object[]{dataObj, host};

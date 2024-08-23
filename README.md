@@ -7,55 +7,62 @@
 
 ## 关于CaA
 
-**CaA**是一个基于`BurpSuite Java插件API`开发的流量收集和分析插件。它的主要作用就是收集HTTP协议报文中的参数、路径、文件、参数值等信息，并统计出现的频次，为使用者积累真正具有实战意义的Fuzzing字典。除此之外，CaA还提供了独立的Fuzzing功能，可以根据用户输入的字典，以不同的请求方式交叉遍历请求，从而帮助用户发现隐藏的参数、路径、文件，以便于进一步发现安全漏洞。
+**CaA**是一款**网络安全（漏洞挖掘）领域**下的辅助型项目，收集HTTP协议报文中的参数、路径、文件、参数值等信息，并统计出现的频次，从而帮助用户构建出具有实战应用价值的Fuzzing字典。除此之外CaA可以生成各类HTTP请求提供给BurpSuite Intruder用于Fuzzing工作。
+
+**CaA**的设计思想来源于Web Fuzzing技术，皆在帮助用户发现隐藏的漏洞面，通过对信息的收集分析整理，让用户真正意义上的实现**数据挖掘**。
+
+**思路来源**:
+
+1. [我的Web应用安全模糊测试之路](https://gh0st.cn/archives/2018-07-25/1)
+2. [WebFuzzing方法和漏洞案例总结](https://gh0st.cn/archives/2019-11-11/1)
 
 **所获荣誉**:
 
 1. [入选2024年KCon兵器谱](https://mp.weixin.qq.com/s/H7QLItrMw-aaqL2-CAvBTg)
 
+**注意事项**:
+
+1. CaA采用`Montoya API`进行开发，需要满足BurpSuite版本（>=2023.12.1）才能使用。
+
 ## 使用方法
 
-插件装载: `Extender - Extensions - Add - Select File - Next`。
+插件装载: `Extender - Extensions - Add - Select File - Next`
 
-数据存储在SQLite数据库中，文件位于插件Jar包同级目录下的`/Data/CaA.db`。
+初次装载`CaA`会自动创建配置文件`Config.json`和数据库文件`CaA.db`：
 
-### Collector
+1. Linux/Mac用户的配置文件目录：`~/.config/CaA/`
+2. Windows用户的配置文件目录：`%USERPROFILE%/.config/CaA/`
 
-CaA收集功能主要应用于HTTP请求和响应。收集的数据信息主要为参数、参数值、请求路径、请求文件。
+除此之外，您也可以选择将配置文件存放在`CaA Jar包`的同级目录下的`/.config/CaA/`中，**以便于离线携带**。
 
-| 类型     | 来源                                                                                        |
-|----------|-----------------------------------------------------------------------------------------------|
-| 参数     | 请求参数（常规、JSON）、响应主体（JSON、INPUT标签TYPE为HIDDEN属性的NAME值）、请求头（Cookie）。 |
-| 参数值   | 同参数，不仅会收集参数名，也会收集参数值。                                                         |
-| 请求路径 | 以`/`符号对请求路径进行分割，逐层收集路径信息。                                                 |
-| 请求文件 | 以`.`符号对请求路径进行处理，收集最终带有文件后缀名的请求文件。                                 |
+你可以很方便的在CollectInfo中右键选择RAW、JSON、XML类型的参数值进行复制，用于对请求的测试。
 
-CaA所收集到的数据可以在响应包的Tab标签页`CollectInfo`，便于查看当前请求及当前网站收集到的数据信息。
+<img src="images/right-click-function.png" style="width: 80%" />
 
-![collectinfo.png](images/panel/collectinfo.png)
+### 功能说明
 
-同时你也可以在CaA独立界面中的`Databoard`进行数据的查询，可以查询所有数据以及单个Host的数据。
+收集的信息类型：
+1. GET、POST正常形式参数和值；
+2. Cookie名和值；
+3. POST（JSON、Multipart、XML）参数和值；
+4. 逐层路径、文件和完整路径。
 
-![databoard](images/panel/databoard.png)
+生成的Payload信息：
+1. GET请求；
+2. POST请求；
+3. POST With JSON请求；
+4. POST With XML请求；
+5. POST With Multipart请求；
+6. 目录逐层遍历请求。
 
-### Analyzer
+### 界面信息
 
-CaA分析功能主要为Web Fuzzing形态，可以对参数、参数值、请求路径、请求文件分别进行模糊测试，支持自定义字典。
-
-我们可以在`CollectInfo`或`Databoard`界面中选择数据，并右键单击`Send to Fuzzer`即可开始配置。
-
-![send_to_fuzzer](images/panel/fuzzer/send_to_fuzzer.png)
-
-如果你是基于`CollectInfo`到配置页面的，就不需要配置请求信息，如果不是则需要。接着你可以在添加、修改、删除、去重Payload，以及选择Fuzzer工作的模式：参数、路径、文件、参数值。当一切配置完成之后单击`Confirm`按钮，输入任务名称即可开始Fuzzing工作。
-
-![fuzzer_config](images/panel/fuzzer/fuzzer_config.png)
-
-![input_task_name](images/panel/fuzzer/input_task_name.png)
-
-当你想要查看Fuzzer任务信息，可以在CaA独立界面中的`Databoard`进行查询。输入你创建的任务名称，就会有对应的下拉选择框，选择对应的信息，回车即可查询。
-
-![taskboard](images/panel/taskboard.png)
-
+| 界面名称                  | 界面展示                                              |
+| ------------------------ | ---------------------------------------------------- |
+| Databoard（数据集合）     | <img src="images/databoard.png" style="width: 80%" />     |
+| Config（配置管理）    | <img src="images/config.png" style="width: 80%" />    |
+| Generator（字典生成） | <img src="images/generator.png" style="width: 80%" /> |
+| CollectInfo（数据展示） | <img src="images/collectinfo.png" style="width: 80%" /> |
 
 ## 最后
 

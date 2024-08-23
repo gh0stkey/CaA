@@ -11,16 +11,11 @@ import burp.api.montoya.scanner.ConsolidationAction;
 import burp.api.montoya.scanner.ScanCheck;
 import burp.api.montoya.scanner.audit.insertionpoint.AuditInsertionPoint;
 import burp.api.montoya.scanner.audit.issues.AuditIssue;
-import caa.Config;
 import caa.cache.CachePool;
+import caa.utils.ConfigLoader;
 import caa.utils.HashCalculator;
+import caa.utils.HttpUtils;
 import caa.utils.JsonTraverser;
-
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.concurrent.*;
-
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
 import com.google.gson.JsonParser;
@@ -28,6 +23,11 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 import static burp.api.montoya.scanner.AuditResult.auditResult;
 import static burp.api.montoya.scanner.ConsolidationAction.KEEP_BOTH;
@@ -37,18 +37,22 @@ import static java.util.Collections.emptyList;
 public class Collector implements ScanCheck {
     private final MontoyaApi api;
     private final Database db;
+    private final ConfigLoader configLoader;
+    private final HttpUtils httpUtils;
     private Map<String, Object> dataMap;
 
     // 初始化存储容器
     private Set<String> pathList;
+    private Set<String> fullPathList;
     private Set<String> fileList;
     private Set<String> paramList;
     private SetMultimap<String, String> valueList;
 
-    public Collector(MontoyaApi api, Database db)
-    {
+    public Collector(MontoyaApi api, Database db, ConfigLoader configLoader) {
         this.api = api;
         this.db = db;
+        this.configLoader = configLoader;
+        this.httpUtils = new HttpUtils(api, configLoader);
     }
 
     @Override
@@ -60,6 +64,7 @@ public class Collector implements ScanCheck {
     public AuditResult passiveAudit(HttpRequestResponse baseRequestResponse) {
         dataMap = new HashMap<>();
         pathList = new HashSet<>();
+        fullPathList = new HashSet<>();
         fileList = new HashSet<>();
         paramList = new HashSet<>();
         valueList = LinkedHashMultimap.create();
@@ -68,7 +73,6 @@ public class Collector implements ScanCheck {
         HttpRequest request = baseRequestResponse.request();
         HttpResponse response = baseRequestResponse.response();
         if (request != null) {
-            // 基于URL来获取URI，因为原生的request.path()会获取到参数
             String path = "";
             String host = "";
             try {
@@ -78,25 +82,20 @@ public class Collector implements ScanCheck {
             } catch (Exception ignored) {
             }
 
-            String extension = "";
-            int lastIndexOfDot = path.lastIndexOf('.');
-            if (lastIndexOfDot != -1) {
-                extension = path.substring(lastIndexOfDot + 1);
-            }
-
-
-            // 排除静态后缀请求
-            if (!Config.excludeSuffix.contains(extension.toLowerCase())) {
+            boolean matches = httpUtils.verifyHttpRequestResponse(baseRequestResponse, "Proxy");
+            if (!matches) {
                 // -----------------处理请求报文-----------------
                 // 收集请求路径，每一层都获取
                 if (!"/".equals(path)) {
                     Arrays.stream(path.split("/")).filter(p -> !p.isBlank()).forEach(p -> {
-                        if (p.contains(".") && !p.equals(".")) {
+                        if (p.contains(".") && !p.equals(".") && p.indexOf(".") != p.length() - 1) {
                             fileList.add(p);
                         } else {
                             pathList.add(p.replaceAll(":", ""));
                         }
                     });
+                    // 收集全路径
+                    fullPathList.add(path);
                 }
 
                 // 收集请求参数
@@ -172,24 +171,28 @@ public class Collector implements ScanCheck {
                             // 存储结果到内存中
                             Map<String, Object> collectMap = new HashMap<>();
 
-                            if (pathList.size() > 0) {
+                            if (!pathList.isEmpty()) {
                                 collectMap.put("Path", pathList);
                                 collectMap.put("All Path", pathList);
                             }
-                            if (fileList.size() > 0) {
+                            if (!fullPathList.isEmpty()) {
+                                collectMap.put("FullPath", fullPathList);
+                                collectMap.put("All FullPath", fullPathList);
+                            }
+                            if (!fileList.isEmpty()) {
                                 collectMap.put("File", fileList);
                                 collectMap.put("All File", fileList);
                             }
-                            if (paramList.size() > 0) {
+                            if (!paramList.isEmpty()) {
                                 collectMap.put("Param", paramList);
                                 collectMap.put("All Param", paramList);
                             }
-                            if (valueList.size() > 0) {
+                            if (!valueList.isEmpty()) {
                                 collectMap.put("Value", valueList);
                             }
 
-                            if (collectMap.size() > 0) {
-                                String finalHost = host;
+                            if (!collectMap.isEmpty()) {
+                                String finalHost = host.toLowerCase();
                                 CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> {
                                     db.insertData(finalHost, collectMap);
                                     return null;
@@ -236,6 +239,10 @@ public class Collector implements ScanCheck {
         Object pathData = db.selectData(host, "Path", "");
         if (pathData != null) {
             dataMap.put("Path", pathData);
+        }
+        Object allPathData = db.selectData(host, "FullPath", "");
+        if (pathData != null) {
+            dataMap.put("FullPath", allPathData);
         }
         Object fileData = db.selectData(host, "File", "");
         if (fileData != null) {
@@ -302,7 +309,7 @@ public class Collector implements ScanCheck {
                     return null;
                 }
 
-            } catch (Exception e){
+            } catch (Exception e) {
                 return null;
             }
         }
