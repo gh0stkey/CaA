@@ -140,7 +140,7 @@ public class DatatablePanel extends JPanel {
 
         // 右键快捷方式
         JPopupMenu popupMenu = new JPopupMenu();
-        JMenuItem generatorPayload = new JMenuItem("Generator Payload");
+        JMenuItem generatorPayload = new JMenuItem("Send to Payload Generator");
         JMenu copyMenu = new JMenu("Copy Payload");
         JMenuItem rawCopy = new JMenuItem("Raw");
         JMenuItem jsonCopy = new JMenuItem("Json");
