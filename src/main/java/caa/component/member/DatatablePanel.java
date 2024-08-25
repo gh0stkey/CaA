@@ -245,14 +245,14 @@ public class DatatablePanel extends JPanel {
         for (int row : selectRows) {
             int columnCount = table.getColumnCount();
             switch (columnCount) {
-                case 2 -> selectData.append(table.getValueAt(row, 1).toString()).append("\r\n");
+                case 2 -> selectData.append(table.getValueAt(row, 1).toString()).append("\n");
                 case 3 ->
-                        selectData.append(String.format("%s\t%s", table.getValueAt(row, 1).toString(), table.getValueAt(row, 2).toString())).append("\r\n");
+                        selectData.append(String.format("%s\t%s", table.getValueAt(row, 1).toString(), table.getValueAt(row, 2).toString())).append("\n");
             }
         }
 
         if (!selectData.isEmpty()) {
-            selectData.delete(selectData.length() - 2, selectData.length());
+            selectData.delete(selectData.length() - 1, selectData.length());
         } else {
             return "";
         }
