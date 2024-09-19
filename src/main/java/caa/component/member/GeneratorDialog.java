@@ -271,7 +271,14 @@ public class GeneratorDialog extends JDialog {
         if (!data.isBlank()) {
             String[] rows = data.split("\\r?\\n");
             for (String row : rows) {
-                String[] cellData = {row.split("=")[0], httpUtils.decodeParameter(row.split("=")[1])};
+                String[] cellData;
+
+                if (row.contains("=")) {
+                    cellData = new String[]{row.split("=")[0], httpUtils.decodeParameter(row.split("=")[1])};
+                } else {
+                    cellData = new String[]{row};
+                }
+
                 model.addRow(cellData);
             }
             UITools.deduplicateTableData(model);
