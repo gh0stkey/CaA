@@ -249,8 +249,7 @@ public class Database {
 
     private void prepareStatement(Object dataObj, PreparedStatement ps) {
         try {
-            if (dataObj instanceof Object[]) {
-                Object[] data = (Object[]) dataObj;
+            if (dataObj instanceof Object[] data) {
                 for (int i = 0; i < data.length; i++) {
                     ps.setString(i + 1, (String) data[i]);
                 }

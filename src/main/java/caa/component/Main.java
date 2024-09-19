@@ -59,7 +59,7 @@ public class Main extends JPanel {
                 GridBagConstraints.CENTER, GridBagConstraints.BOTH,
                 new Insets(0, 0, 0, 0), 0, 0));
 
-        mainTabbedPane.addTab("Databoard", new Databoard(api, db));
+        mainTabbedPane.addTab("Databoard", new Databoard(api, db, configLoader));
         mainTabbedPane.addTab("Config", new Config(api, configLoader));
     }
 }

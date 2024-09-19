@@ -5,6 +5,7 @@ import caa.Config;
 import caa.component.member.DatatablePanel;
 import caa.component.utils.UITools;
 import caa.instances.Database;
+import caa.utils.ConfigLoader;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -25,6 +26,7 @@ public class Databoard extends JPanel {
     private JPanel dataPanel;
     private final MontoyaApi api;
     private final Database db;
+    private final ConfigLoader configLoader;
     private final String defaultText = "Please enter the host";
 
     private static Boolean isMatchHost = false;
@@ -34,7 +36,7 @@ public class Databoard extends JPanel {
 
     private String previousHostText = "";
 
-    private ActionListener actionListener = new ActionListener() {
+    private final ActionListener actionListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
             String selected = tableComboBox.getSelectedItem().toString();
@@ -54,9 +56,10 @@ public class Databoard extends JPanel {
         }
     };
 
-    public Databoard(MontoyaApi api, Database db) {
+    public Databoard(MontoyaApi api, Database db, ConfigLoader configLoader) {
         this.api = api;
         this.db = db;
+        this.configLoader = configLoader;
         initComponents();
     }
 
@@ -196,11 +199,11 @@ public class Databoard extends JPanel {
                                     List<String> columnNameB = new ArrayList<>();
                                     columnNameB.add("Name");
                                     columnNameB.add("Value");
-                                    dataPanel.add(new DatatablePanel(api, db, columnNameB, selectedObject, null, tableName), BorderLayout.CENTER);
+                                    dataPanel.add(new DatatablePanel(api, db, configLoader, columnNameB, selectedObject, null, tableName), BorderLayout.CENTER);
                                 } else {
                                     List<String> columnNameA = new ArrayList<>();
                                     columnNameA.add("Name");
-                                    dataPanel.add(new DatatablePanel(api, db, columnNameA, selectedObject, null, tableName), BorderLayout.CENTER);
+                                    dataPanel.add(new DatatablePanel(api, db, configLoader, columnNameA, selectedObject, null, tableName), BorderLayout.CENTER);
                                 }
 
                                 if (!selectedHost.equals(previousHostText)) {

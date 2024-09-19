@@ -5,6 +5,8 @@ import burp.api.montoya.http.message.requests.HttpRequest;
 import caa.component.utils.UITools;
 import caa.instances.Database;
 import caa.instances.Generator;
+import caa.utils.ConfigLoader;
+import caa.utils.HttpUtils;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -18,11 +20,13 @@ import java.awt.event.MouseEvent;
 import java.util.stream.IntStream;
 
 public class GeneratorDialog extends JDialog {
-    private HttpRequest httpRequest;
-    private String tabName;
+    private final HttpRequest httpRequest;
+    private final String tabName;
     private final Generator generator;
     private final MontoyaApi api;
     private final Database db;
+    private final ConfigLoader configLoader;
+    private final HttpUtils httpUtils;
     private final JPanel contentPanel;
     private final String payload;
     private final Dimension dialogDimension = new Dimension(600, 700);
@@ -30,7 +34,7 @@ public class GeneratorDialog extends JDialog {
     private JTable payloadTable;
     private final JComboBox<String> payloadModeComboBox;
     private int randomStringFlag;
-    private JTextField typeLengthField = new JTextField("6");
+    private final JTextField typeLengthField = new JTextField("6");
 
     private final MouseAdapter mouseAdapter = new MouseAdapter() {
         public void mouseReleased(MouseEvent e) {
@@ -40,13 +44,15 @@ public class GeneratorDialog extends JDialog {
         }
     };
 
-    public GeneratorDialog(DatatablePanel datatablePanel, MontoyaApi api, Database db, HttpRequest httpRequest, String tabName, String payload) {
+    public GeneratorDialog(DatatablePanel datatablePanel, MontoyaApi api, Database db, ConfigLoader configLoader, HttpRequest httpRequest, String tabName, String payload) {
         this.api = api;
         this.db = db;
+        this.configLoader = configLoader;
+        this.httpUtils = new HttpUtils(api, configLoader);
         this.httpRequest = httpRequest;
         this.tabName = tabName;
         this.payload = payload;
-        this.generator = new Generator(api);
+        this.generator = new Generator(api, configLoader);
 
         this.payloadModeComboBox = new JComboBox<>();
         this.contentPanel = new JPanel(new BorderLayout());
@@ -126,7 +132,7 @@ public class GeneratorDialog extends JDialog {
         radioButton.addItemListener(new ItemListener() {
             @Override
             public void itemStateChanged(ItemEvent e) {
-                if (radioButton.getText().toString().equals("A-Za-z")) {
+                if (radioButton.getText().equals("A-Za-z")) {
                     randomStringFlag = 1;
                 } else {
                     randomStringFlag = 2;
@@ -168,7 +174,7 @@ public class GeneratorDialog extends JDialog {
         JButton removeButton = new JButton("Remove");
         JButton pasteButton = new JButton("Paste");
         JButton clearButton = new JButton("Clear");
-        String[] mode = new String[]{"Param", "File", "Path", "Value"};
+        String[] mode = new String[]{"Param", "File", "FullPath", "Path", "Value"};
         payloadModeComboBox.setModel(new DefaultComboBoxModel<>(mode));
 
         // Value 修改Name快捷方式
@@ -240,30 +246,32 @@ public class GeneratorDialog extends JDialog {
 
     private String getTableData(JTable table) {
         int rowCount = table.getRowCount();
-        // 用一个数组代替之前的 getSelectedRows() 方法返回的数组
         int[] allRows = IntStream.range(0, rowCount).toArray();
-        StringBuilder allData = new StringBuilder();
+        StringBuilder selectData = new StringBuilder();
+
         for (int row : allRows) {
             int columnCount = table.getColumnCount();
             switch (columnCount) {
-                case 1 -> allData.append(table.getValueAt(row, 0).toString()).append("\n");
+                case 1 -> selectData.append(table.getValueAt(row, 0).toString()).append("\r\n");
                 case 2 ->
-                        allData.append(String.format("%s\t%s", table.getValueAt(row, 0).toString(), table.getValueAt(row, 1).toString())).append("\n");
+                        selectData.append(String.format("%s=%s", table.getValueAt(row, 0).toString(), table.getValueAt(row, 1).toString())).append("\r\n");
             }
         }
 
-        if (!allData.isEmpty()) {
-            allData.deleteCharAt(allData.length() - 1);
+        if (!selectData.isEmpty()) {
+            selectData.delete(selectData.length() - 2, selectData.length());
+        } else {
+            return "";
         }
 
-        return allData.toString();
+        return selectData.toString();
     }
 
     private void addDataToTable(String data, DefaultTableModel model) {
         if (!data.isBlank()) {
             String[] rows = data.split("\\r?\\n");
             for (String row : rows) {
-                String[] cellData = row.split("\\t");
+                String[] cellData = {row.split("=")[0], httpUtils.decodeParameter(row.split("=")[1])};
                 model.addRow(cellData);
             }
             UITools.deduplicateTableData(model);

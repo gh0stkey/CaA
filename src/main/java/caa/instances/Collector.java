@@ -102,7 +102,7 @@ public class Collector implements ScanCheck {
                 List<ParsedHttpParameter> paramsList = request.parameters();
                 for (ParsedHttpParameter param : paramsList) {
                     // 处理URL编码、问号
-                    String paramName = decodeParameter(param.name()).trim().replaceAll("\\?", "");
+                    String paramName = httpUtils.decodeParameter(param.name()).trim().replaceAll("\\?", "");
 
                     if ("_".equals(paramName)) {
                         paramName = paramName.replace("_", "");
@@ -110,7 +110,7 @@ public class Collector implements ScanCheck {
 
                     if (!paramName.isBlank() && paramName.matches("[\\w\\-\\.]+")) {
                         paramList.add(paramName);
-                        String paramValue = decodeParameter(param.value());
+                        String paramValue = httpUtils.decodeParameter(param.value());
 
                         // 收集、处理参数值为JSON内容的数据
                         if (!paramValue.isBlank()) {
@@ -268,14 +268,6 @@ public class Collector implements ScanCheck {
         if (jsonKey != null) {
             paramList.addAll((HashSet) jsonKey);
         }
-    }
-
-    private String decodeParameter(String input) {
-        try {
-            input = api.utilities().urlUtils().decode(input);
-        } catch (Exception ignored) {
-        }
-        return input;
     }
 
     public static Map<String, Object> getJsonData(String responseBody) {

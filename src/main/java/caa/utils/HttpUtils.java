@@ -18,6 +18,14 @@ public class HttpUtils {
         this.configLoader = configLoader;
     }
 
+    public String decodeParameter(String input) {
+        try {
+            input = api.utilities().urlUtils().decode(input);
+        } catch (Exception ignored) {
+        }
+        return input;
+    }
+
     public static String replaceFirstOccurrence(String original, String find, String replace) {
         int index = original.indexOf(find);
         if (index != -1) {

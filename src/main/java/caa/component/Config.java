@@ -258,11 +258,10 @@ public class Config extends JPanel {
 
     private void addActionPerformed(ActionEvent e, DefaultTableModel model, JTextField addTextField) {
         String addTextFieldText = addTextField.getText();
-        api.logging().logToOutput(addTextFieldText);
-        if (!addTextFieldText.equals(defaultText)) {
+        if (addTextField.getForeground().equals(Color.BLACK)) {
             addDataToTable(addTextFieldText, model);
+            addTextField.setText("");
+            addTextField.requestFocusInWindow();
         }
-        addTextField.setText("");
-        addTextField.requestFocusInWindow();
     }
 }

@@ -8,6 +8,8 @@ import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.requests.HttpTransformation;
 import burp.api.montoya.utilities.RandomUtils;
 import caa.Config;
+import caa.utils.ConfigLoader;
+import caa.utils.HttpUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
@@ -19,30 +21,36 @@ import java.util.*;
 
 public class Generator {
     private final MontoyaApi api;
+    private final ConfigLoader configLoader;
+    private final HttpUtils httpUtils;
 
-    public Generator(MontoyaApi api) {
+    public Generator(MontoyaApi api, ConfigLoader configLoader) {
         this.api = api;
+        this.configLoader = configLoader;
+        this.httpUtils = new HttpUtils(api, configLoader);
     }
 
     public boolean generateRequest(HttpRequest request, String payload, String payloadMode, int randomStringFlag, int randomStringLength) {
         Object payloadObj = null;
 
-        if (payload.contains("\t")) {
-            List<String> dataList = Arrays.stream(payload.split("\n")).toList();
+        if (payload.contains("=")) {
+            List<String> dataList = Arrays.stream(payload.split("\r\n")).toList();
             SetMultimap<String, String> keyValues = HashMultimap.create();
             for (String data : dataList) {
-                List<String> tmpData = Arrays.stream(data.split("\t")).toList();
-                keyValues.put(tmpData.get(0), tmpData.get(1));
+                String param = data.split("=")[0];
+                String value = data.split("=")[1];
+                keyValues.put(param, value);
             }
             payloadObj = keyValues;
         } else {
-            payloadObj = Arrays.stream(payload.split("\n")).toList();
+            payloadObj = Arrays.stream(payload.split("\r\n")).toList();
         }
         List<HttpRequest> requestList = new ArrayList<>();
         switch (payloadMode) {
             case "Param", "Value", "Current" ->
                     requestList = generateParamAndValueWithRequest(request, payloadObj, randomStringFlag, randomStringLength);
-            case "Path", "File" -> requestList = generateEndpointWithRequest(request, (List<String>) payloadObj);
+            case "FullPath", "Path", "File" ->
+                    requestList = generateEndpointWithRequest(request, (List<String>) payloadObj);
         }
 
         if (!requestList.isEmpty()) {
@@ -238,14 +246,14 @@ public class Generator {
     public String generateRawParam(String payload) {
         List<String> paramValueList = new ArrayList<>();
         String formatString = "{0}={1}";
-        if (payload.contains("\t")) {
-            for (String paramValue : payload.split("\n")) {
-                String param = paramValue.split("\t")[0];
-                String value = paramValue.split("\t")[1];
+        if (payload.contains("=")) {
+            for (String paramValue : payload.split("\r\n")) {
+                String param = paramValue.split("=")[0];
+                String value = httpUtils.decodeParameter(paramValue.split("=")[1]);
                 paramValueList.add(MessageFormat.format(formatString, param, value));
             }
         } else {
-            for (String param : payload.split("\n")) {
+            for (String param : payload.split("\r\n")) {
                 paramValueList.add(MessageFormat.format(formatString, param, generateRandomString(6, 1)));
             }
         }
@@ -254,14 +262,14 @@ public class Generator {
 
     public String generateJsonParam(String payload) {
         JsonObject jsonObject = new JsonObject();
-        if (payload.contains("\t")) {
-            for (String paramValue : payload.split("\n")) {
-                String param = paramValue.split("\t")[0];
-                String value = paramValue.split("\t")[1];
+        if (payload.contains("=")) {
+            for (String paramValue : payload.split("\r\n")) {
+                String param = paramValue.split("=")[0];
+                String value = httpUtils.decodeParameter(paramValue.split("=")[1]);
                 jsonObject.addProperty(param, value);
             }
         } else {
-            for (String param : payload.split("\n")) {
+            for (String param : payload.split("\r\n")) {
                 jsonObject.addProperty(param, generateRandomString(6, 1));
             }
         }
@@ -271,14 +279,14 @@ public class Generator {
     public String generateXmlParam(String payload) {
         List<String> paramValueList = new ArrayList<>();
         String formatString = "<{0}>{1}</{0}>";
-        if (payload.contains("\t")) {
-            for (String paramValue : payload.split("\n")) {
-                String param = paramValue.split("\t")[0];
-                String value = paramValue.split("\t")[1];
+        if (payload.contains("=")) {
+            for (String paramValue : payload.split("\r\n")) {
+                String param = paramValue.split("=")[0];
+                String value = httpUtils.decodeParameter(paramValue.split("=")[1]);
                 paramValueList.add(MessageFormat.format(formatString, param, value));
             }
         } else {
-            for (String param : payload.split("\n")) {
+            for (String param : payload.split("\r\n")) {
                 paramValueList.add(MessageFormat.format(formatString, param, generateRandomString(5, 1)));
             }
         }

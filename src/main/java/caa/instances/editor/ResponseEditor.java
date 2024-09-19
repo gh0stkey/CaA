@@ -72,7 +72,7 @@ public class ResponseEditor implements HttpResponseEditorProvider {
         public void setRequestResponse(HttpRequestResponse requestResponse) {
             this.requestResponse = requestResponse;
             if (dataMap != null && !dataMap.isEmpty()) {
-                SharedTabBuilder tabBuilder = new SharedTabBuilder(api, db, jTabbedPane, jTabbedPaneA, jTabbedPaneB);
+                SharedTabBuilder tabBuilder = new SharedTabBuilder(api, db, configLoader, jTabbedPane, jTabbedPaneA, jTabbedPaneB);
                 dataPanel = tabBuilder.generateTabWithData(dataMap, requestResponse.request());
             }
         }

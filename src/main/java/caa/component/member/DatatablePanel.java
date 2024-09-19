@@ -5,6 +5,7 @@ import burp.api.montoya.http.message.requests.HttpRequest;
 import caa.component.utils.UITools;
 import caa.instances.Database;
 import caa.instances.Generator;
+import caa.utils.ConfigLoader;
 import com.google.common.collect.SetMultimap;
 
 import javax.swing.*;
@@ -29,6 +30,7 @@ public class DatatablePanel extends JPanel {
     private final JTextField searchField;
     private final TableRowSorter<DefaultTableModel> sorter;
     private final MontoyaApi api;
+    private final ConfigLoader configLoader;
     private final JCheckBox searchMode = new JCheckBox("Reverse search");
     private final String tabName;
     private final Object dataObj;
@@ -37,14 +39,15 @@ public class DatatablePanel extends JPanel {
     private final Database db;
     private final Generator generator;
 
-    public DatatablePanel(MontoyaApi api, Database db, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName) {
+    public DatatablePanel(MontoyaApi api, Database db, ConfigLoader configLoader, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName) {
         this.api = api;
         this.db = db;
+        this.configLoader = configLoader;
         this.tabName = tabName.replace("All ", "");
         this.dataObj = dataObj;
         this.httpRequest = httpRequest;
         this.columnSize = columnNameList.size();
-        this.generator = new Generator(api);
+        this.generator = new Generator(api, configLoader);
 
         String[] columnNames = new String[columnSize + 1];
         columnNames[0] = "#";
@@ -166,7 +169,7 @@ public class DatatablePanel extends JPanel {
 
         generatorPayload.addActionListener(e -> {
             String payload = getSelectedDataAtTable(dataTable);
-            new GeneratorDialog(this, api, db, httpRequest, tabName, payload);
+            new GeneratorDialog(this, api, db, configLoader, httpRequest, tabName, payload);
         });
 
         dataTable.addMouseListener(new MouseAdapter() {
@@ -245,19 +248,27 @@ public class DatatablePanel extends JPanel {
         for (int row : selectRows) {
             int columnCount = table.getColumnCount();
             switch (columnCount) {
-                case 2 -> selectData.append(table.getValueAt(row, 1).toString()).append("\n");
+                case 2 -> selectData.append(table.getValueAt(row, 1).toString()).append("\r\n");
                 case 3 ->
-                        selectData.append(String.format("%s\t%s", table.getValueAt(row, 1).toString(), table.getValueAt(row, 2).toString())).append("\n");
+                        selectData.append(String.format("%s=%s", table.getValueAt(row, 1).toString(), encodeParameter(table.getValueAt(row, 2).toString()))).append("\r\n");
             }
         }
 
         if (!selectData.isEmpty()) {
-            selectData.delete(selectData.length() - 1, selectData.length());
+            selectData.delete(selectData.length() - 2, selectData.length());
         } else {
             return "";
         }
 
         return selectData.toString();
+    }
+
+    public String encodeParameter(String input) {
+        try {
+            input = api.utilities().urlUtils().encode(input);
+        } catch (Exception ignored) {
+        }
+        return input;
     }
 
     public JTable getDataTable() {
