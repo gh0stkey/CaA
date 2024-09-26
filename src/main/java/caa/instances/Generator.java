@@ -243,21 +243,21 @@ public class Generator {
         return this.api.utilities().randomUtils().randomString(length, strFlag == 1 ? RandomUtils.CharacterSet.ASCII_LETTERS : RandomUtils.CharacterSet.DIGITS);
     }
 
-    public String generateRawParam(String payload) {
+    public String generateRawParam(String payload, String formatChar, String delimiter) {
         List<String> paramValueList = new ArrayList<>();
-        String formatString = "{0}={1}";
+        String formatString = "{0}{1}{2}";
         if (payload.contains("=")) {
             for (String paramValue : payload.split("\r\n")) {
                 String param = paramValue.split("=")[0];
                 String value = httpUtils.decodeParameter(paramValue.split("=")[1]);
-                paramValueList.add(MessageFormat.format(formatString, param, value));
+                paramValueList.add(MessageFormat.format(formatString, param, formatChar, value));
             }
         } else {
             for (String param : payload.split("\r\n")) {
-                paramValueList.add(MessageFormat.format(formatString, param, generateRandomString(6, 1)));
+                paramValueList.add(MessageFormat.format(formatString, param, formatChar, generateRandomString(6, 1)));
             }
         }
-        return String.join("&", paramValueList);
+        return String.join(delimiter, paramValueList);
     }
 
     public String generateJsonParam(String payload) {

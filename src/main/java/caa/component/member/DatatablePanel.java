@@ -145,16 +145,32 @@ public class DatatablePanel extends JPanel {
         JPopupMenu popupMenu = new JPopupMenu();
         JMenuItem generatorPayload = new JMenuItem("Send to Payload Generator");
         JMenu copyMenu = new JMenu("Copy Payload");
-        JMenuItem rawCopy = new JMenuItem("Raw");
+        JMenu rawMenu = new JMenu("Raw");
+        JMenuItem rawWithParamCopy = new JMenuItem("Raw with Param");
+        JMenuItem rawWithCookieCopy = new JMenuItem("Raw with Cookie");
+        JMenuItem rawWithHeaderCopy = new JMenuItem("Raw with Header");
         JMenuItem jsonCopy = new JMenuItem("Json");
         JMenuItem xmlCopy = new JMenuItem("Xml");
-        copyMenu.add(rawCopy);
+        copyMenu.add(rawMenu);
+        rawMenu.add(rawWithParamCopy);
+        rawMenu.add(rawWithCookieCopy);
+        rawMenu.add(rawWithHeaderCopy);
         copyMenu.add(jsonCopy);
         copyMenu.add(xmlCopy);
 
-        rawCopy.addActionListener(e -> {
+        rawWithParamCopy.addActionListener(e -> {
             String payload = getSelectedDataAtTable(dataTable);
-            setClipboardContents(generator.generateRawParam(payload));
+            setClipboardContents(generator.generateRawParam(payload, "=", "&"));
+        });
+
+        rawWithCookieCopy.addActionListener(e -> {
+            String payload = getSelectedDataAtTable(dataTable);
+            setClipboardContents(generator.generateRawParam(payload, "=", "; "));
+        });
+
+        rawWithHeaderCopy.addActionListener(e -> {
+            String payload = getSelectedDataAtTable(dataTable);
+            setClipboardContents(generator.generateRawParam(payload, ": ","\r\n"));
         });
 
         jsonCopy.addActionListener(e -> {

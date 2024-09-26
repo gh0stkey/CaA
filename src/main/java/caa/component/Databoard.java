@@ -40,6 +40,8 @@ public class Databoard extends JPanel {
         @Override
         public void actionPerformed(ActionEvent e) {
             String selected = tableComboBox.getSelectedItem().toString();
+            dataPanel.removeAll();
+
             if (selected.contains("All")) {
                 hostTextField.setEnabled(false);
                 handleComboBoxAction(null, "*");
@@ -48,8 +50,8 @@ public class Databoard extends JPanel {
                 String host = hostTextField.getText();
                 if (host.equals("*")) {
                     hostTextField.setText("");
-                    dataPanel.removeAll();
-                } else {
+                    hostTextField.setForeground(Color.BLACK);
+                } else if (hostTextField.getForeground().equals(Color.BLACK)) {
                     handleComboBoxAction(null, host);
                 }
             }
@@ -179,8 +181,6 @@ public class Databoard extends JPanel {
                 if (handleComboBoxWorker != null && !handleComboBoxWorker.isDone()) {
                     handleComboBoxWorker.cancel(true);
                 }
-
-                dataPanel.removeAll();
 
                 handleComboBoxWorker = new SwingWorker<Object, Void>() {
                     @Override
