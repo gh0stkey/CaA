@@ -11,6 +11,8 @@ import caa.utils.HttpUtils;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ItemEvent;
@@ -28,7 +30,7 @@ public class GeneratorDialog extends JDialog {
     private final ConfigLoader configLoader;
     private final HttpUtils httpUtils;
     private final JPanel contentPanel;
-    private final String payload;
+    private String payload;
     private final Dimension dialogDimension = new Dimension(600, 700);
     private final JPopupMenu popupMenu;
     private JTable payloadTable;
@@ -200,12 +202,12 @@ public class GeneratorDialog extends JDialog {
                 payloadTable.addMouseListener(mouseAdapter);
             } else {
                 model.setColumnCount(1);
+
                 payloadTable.removeMouseListener(mouseAdapter);
             }
-
-            addDataToTable(payload, model);
         });
         payloadModeComboBox.setSelectedItem(tabName);
+        addDataToTable(payload, model);
 
         constraints.insets = new Insets(0, 0, 3, 0);
         constraints.gridy = 0;
@@ -221,7 +223,7 @@ public class GeneratorDialog extends JDialog {
 
         JTextField addTextField = new JTextField();
         String defaultText = "Enter a new item";
-        UITools.addPlaceholder(addTextField, defaultText);
+        UITools.setTextFieldPlaceholder(addTextField, defaultText);
 
         inputPanelB.add(addTextField, BorderLayout.CENTER);
         inputPanel.add(scrollPane, BorderLayout.CENTER);
@@ -268,20 +270,23 @@ public class GeneratorDialog extends JDialog {
     }
 
     private void addDataToTable(String data, DefaultTableModel model) {
-        if (!data.isBlank()) {
-            String[] rows = data.split("\\r?\\n");
-            for (String row : rows) {
-                String[] cellData;
-
-                if (row.contains("=")) {
-                    cellData = new String[]{row.split("=")[0], httpUtils.decodeParameter(row.split("=")[1])};
-                } else {
-                    cellData = new String[]{row};
-                }
-
-                model.addRow(cellData);
-            }
-            UITools.deduplicateTableData(model);
+        if (data.isBlank()) {
+            return;
         }
+
+        String[] rows = data.split("\\r?\\n");
+        for (String row : rows) {
+            String[] cellData;
+
+            if (row.contains("=")) {
+                cellData = new String[]{row.split("=")[0], httpUtils.decodeParameter(row.split("=")[1])};
+            } else {
+                cellData = new String[]{row};
+            }
+
+            model.addRow(cellData);
+        }
+
+        UITools.deduplicateTableData(model);
     }
 }

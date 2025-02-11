@@ -183,7 +183,7 @@ public class Config extends JPanel {
         buttonPanel.add(clearButton, constraints);
 
         JTextField addTextField = new JTextField();
-        UITools.addPlaceholder(addTextField, defaultText);
+        UITools.setTextFieldPlaceholder(addTextField, defaultText);
 
         inputPanelB.add(addTextField, BorderLayout.CENTER);
         inputPanel.add(scrollPane, BorderLayout.CENTER);

@@ -93,7 +93,7 @@ public class Databoard extends JPanel {
         hostTextField.setText(defaultText);
         hostTextField.setForeground(Color.GRAY);
 
-        UITools.addPlaceholder(hostTextField, defaultText);
+        UITools.setTextFieldPlaceholder(hostTextField, defaultText);
 
         dataPanel = new JPanel();
         dataPanel.setLayout(new BorderLayout());

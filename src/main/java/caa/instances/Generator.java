@@ -218,7 +218,7 @@ public class Generator {
         }
         String jsonStr = new Gson().toJson(jsonObject);
         String newRequestStr = String.format("%s%s", requestStrWithoutBody, jsonStr);
-        return HttpRequest.httpRequest(httpRequest.httpService(), newRequestStr).withUpdatedHeader("Content-Length", String.valueOf(jsonStr.length()));
+        return HttpRequest.httpRequest(httpRequest.httpService(), newRequestStr).withUpdatedHeader("Content-Length", String.valueOf(jsonStr.length())).withUpdatedHeader("Content-Type", "application/json");
     }
 
     private HttpRequest generateRequestByMultipartMethod(HttpRequest httpRequest) {

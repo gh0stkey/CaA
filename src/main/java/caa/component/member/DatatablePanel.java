@@ -88,7 +88,7 @@ public class DatatablePanel extends JPanel {
 
         // 设置灰色默认文本
         String searchText = "Search";
-        UITools.addPlaceholder(searchField, searchText);
+        UITools.setTextFieldPlaceholder(searchField, searchText);
 
         // 监听输入框内容输入、更新、删除
         searchField.getDocument().addDocumentListener(new DocumentListener() {
