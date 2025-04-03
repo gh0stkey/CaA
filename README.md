@@ -64,6 +64,16 @@
 | Generator（字典生成） | <img src="images/generator.png" style="width: 80%" /> |
 | CollectInfo（数据展示） | <img src="images/collectinfo.png" style="width: 80%" /> |
 
+## 赞赏榜单
+
+感谢各位对项目的赞赏，以下名单基于赞赏时间进行排序，不分先后，如有遗留可联系项目作者进行补充。
+
+| ID       | 金额     |
+| -------- | -------- |
+| 树则     | 18.80元  |
+| 蒙蒙大   | 10.00元  |
+
+
 ## 最后
 
 如果你觉得CaA好用，可以打赏一下作者，给作者持续更新下去的动力！
