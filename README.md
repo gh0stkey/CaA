@@ -79,6 +79,7 @@ We appreciate everyone's support for the project. The following list is sorted b
 | -------- | -------- |
 | 树则     | 18.80 CNY  |
 | 蒙蒙大   | 10.00 CNY  |
+| 耳东   | 20.00 CNY  |
 
 ## Support the Project
 
