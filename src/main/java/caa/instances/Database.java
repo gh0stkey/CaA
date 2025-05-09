@@ -56,7 +56,7 @@ public class Database {
     public Object selectData(String host, String tableName, String limitSize) {
         try {
             if (!connection.isClosed()) {
-                String sql = "select name%s from `" + tableName + "` %s order by count desc";
+                String sql = "select name%s,count from `" + tableName + "` %s order by count desc";
                 if (!limitSize.isBlank()) {
                     sql += " limit " + limitSize;
                 }
@@ -81,22 +81,26 @@ public class Database {
                         while (rs.next()) {
                             String key = rs.getString(1);
                             String value = rs.getString(2);
-                            multimap.put(key, value);
+                            int count = rs.getInt(3);
+                            // 将 count 和 value 组合成一个字符串
+                            String combinedValue = String.format("%d|%s", count, value);
+                            multimap.put(key, combinedValue);
                         }
                         if (multimap.size() <= 0) {
                             return null;
                         }
                         return multimap;
                     } else {
-                        Set<String> resultList = new LinkedHashSet<>();
+                        Map<String, Integer> resultMap = new LinkedHashMap<>();
                         while (rs.next()) {
                             String columnValue = rs.getString(1);
-                            resultList.add(columnValue);
+                            int count = rs.getInt(2);
+                            resultMap.put(columnValue, count);
                         }
-                        if (resultList.isEmpty()) {
+                        if (resultMap.isEmpty()) {
                             return null;
                         }
-                        return resultList;
+                        return resultMap;
                     }
                 }
             }

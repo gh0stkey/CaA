@@ -37,6 +37,11 @@ public class ConfigLoader {
         }
     }
 
+    private static boolean isValidConfigPath(String configPath) {
+        File configPathFile = new File(configPath);
+        return configPathFile.exists() && configPathFile.isDirectory();
+    }
+
     public String getConfigFilePath() {
         return configFilePath;
     }
@@ -63,11 +68,6 @@ public class ConfigLoader {
         return userConfigPath;
     }
 
-    private static boolean isValidConfigPath(String configPath) {
-        File configPathFile = new File(configPath);
-        return configPathFile.exists() && configPathFile.isDirectory();
-    }
-
     public void initConfig() {
         setExcludeSuffix(getExcludeSuffix());
         setExcludeStatus(getExcludeStatus());
@@ -80,40 +80,40 @@ public class ConfigLoader {
         return getValueFromConfig("BlockHost", Config.host);
     }
 
+    public void setBlockHost(String blockHost) {
+        setValueToConfig("BlockHost", blockHost);
+    }
+
     public String getExcludeSuffix() {
         return getValueFromConfig("ExcludeSuffix", Config.suffix);
-    }
-
-    public String getExcludeStatus() {
-        return getValueFromConfig("ExcludeStatus", Config.status);
-    }
-
-    public String getScope() {
-        return getValueFromConfig("CaAScope", Config.scopeOptions);
-    }
-
-    private String getValueFromConfig(String name, String value) {
-        Map<String, String> configContent = loadCurrentConfig();
-        if (!configContent.isEmpty() && configContent.containsKey(name)) {
-            return configContent.get(name);
-        }
-        return value;
     }
 
     public void setExcludeSuffix(String excludeSuffix) {
         setValueToConfig("ExcludeSuffix", excludeSuffix);
     }
 
-    public void setBlockHost(String blockHost) {
-        setValueToConfig("BlockHost", blockHost);
+    public String getExcludeStatus() {
+        return getValueFromConfig("ExcludeStatus", Config.status);
     }
 
     public void setExcludeStatus(String status) {
         setValueToConfig("ExcludeStatus", status);
     }
 
+    public String getScope() {
+        return getValueFromConfig("CaAScope", Config.scopeOptions);
+    }
+
     public void setScope(String scope) {
         setValueToConfig("CaAScope", scope);
+    }
+
+    private String getValueFromConfig(String name, String value) {
+        Map<String, String> configContent = loadCurrentConfig();
+        if (configContent.containsKey(name)) {
+            return configContent.get(name);
+        }
+        return value;
     }
 
     private void setValueToConfig(String name, String value) {

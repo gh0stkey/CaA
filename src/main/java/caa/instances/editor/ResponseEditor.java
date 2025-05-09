@@ -10,7 +10,9 @@ import burp.api.montoya.ui.Selection;
 import burp.api.montoya.ui.editor.extension.EditorCreationContext;
 import burp.api.montoya.ui.editor.extension.ExtensionProvidedHttpResponseEditor;
 import burp.api.montoya.ui.editor.extension.HttpResponseEditorProvider;
+import caa.component.generator.Generator;
 import caa.component.member.DatatablePanel;
+import caa.component.member.DisplayMode;
 import caa.instances.Collector;
 import caa.instances.Database;
 import caa.utils.ConfigLoader;
@@ -19,48 +21,51 @@ import caa.utils.HttpUtils;
 import javax.swing.*;
 import javax.swing.event.ChangeListener;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.List;
 
 public class ResponseEditor implements HttpResponseEditorProvider {
     private final MontoyaApi api;
     private final Database db;
     private final ConfigLoader configLoader;
+    private final Generator generator;
 
-    public ResponseEditor(MontoyaApi api, Database db, ConfigLoader configLoader) {
+    public ResponseEditor(MontoyaApi api, Database db, ConfigLoader configLoader, Generator generator) {
         this.api = api;
         this.db = db;
         this.configLoader = configLoader;
+        this.generator = generator;
     }
 
     @Override
     public ExtensionProvidedHttpResponseEditor provideHttpResponseEditor(EditorCreationContext creationContext) {
-        return new Editor(api, creationContext, db, configLoader);
+        return new Editor(api, creationContext, db, configLoader, generator);
     }
 
     private static class Editor implements ExtensionProvidedHttpResponseEditor {
         private final MontoyaApi api;
+        private final Database db;
         private final ConfigLoader configLoader;
+        private final Generator generator;
+
         private final HttpUtils httpUtils;
         private final JTabbedPane jTabbedPane;
-        private final JTabbedPane jTabbedPaneA;
+        private final EditorCreationContext creationContext;
         private DatatablePanel dataPanel;
         private JTable dataTable;
-        private final JTabbedPane jTabbedPaneB;
-        private final Database db;
-        private final EditorCreationContext creationContext;
         private HttpRequestResponse requestResponse;
         private LinkedHashMap<String, Object> dataMap;
 
-        public Editor(MontoyaApi api, EditorCreationContext creationContext, Database db, ConfigLoader configLoader) {
+        public Editor(MontoyaApi api, EditorCreationContext creationContext, Database db, ConfigLoader configLoader, Generator generator) {
             this.api = api;
             this.db = db;
             this.configLoader = configLoader;
+            this.generator = generator;
+
             this.httpUtils = new HttpUtils(api, configLoader);
             this.creationContext = creationContext;
             this.jTabbedPane = new JTabbedPane();
-            this.jTabbedPaneA = new JTabbedPane();
-            this.jTabbedPaneB = new JTabbedPane();
         }
 
         @Override
@@ -72,8 +77,7 @@ public class ResponseEditor implements HttpResponseEditorProvider {
         public void setRequestResponse(HttpRequestResponse requestResponse) {
             this.requestResponse = requestResponse;
             if (dataMap != null && !dataMap.isEmpty()) {
-                SharedTabBuilder tabBuilder = new SharedTabBuilder(api, db, configLoader, jTabbedPane, jTabbedPaneA, jTabbedPaneB);
-                dataPanel = tabBuilder.generateTabWithData(dataMap, requestResponse.request());
+                dataPanel = generateTabWithData(requestResponse.request());
             }
         }
 
@@ -100,10 +104,9 @@ public class ResponseEditor implements HttpResponseEditorProvider {
                     Collector collector = new Collector(api, db, configLoader);
                     collector.passiveAudit(requestResponse);
 
-                    Map<String, Object> collectMap = collector.getDataMap();
-                    dataMap = SharedMethod.getDataMap(collectMap);
+                    dataMap = new LinkedHashMap<>(collector.getDataMap());
 
-                    return dataMap != null && !dataMap.isEmpty();
+                    return !dataMap.isEmpty();
                 }
             }
 
@@ -119,11 +122,9 @@ public class ResponseEditor implements HttpResponseEditorProvider {
         public Component uiComponent() {
             ChangeListener tabChangeListener = e -> {
                 JTabbedPane sourceTabbedPane = (JTabbedPane) e.getSource();
-                dataTable = (JTable) SharedMethod.getComponent(sourceTabbedPane);
+                dataTable = (JTable) getComponent(sourceTabbedPane);
             };
 
-            jTabbedPaneA.addChangeListener(tabChangeListener);
-            jTabbedPaneB.addChangeListener(tabChangeListener);
             jTabbedPane.addChangeListener(tabChangeListener);
 
             return jTabbedPane;
@@ -148,6 +149,36 @@ public class ResponseEditor implements HttpResponseEditorProvider {
         @Override
         public boolean isModified() {
             return false;
+        }
+
+        private DatatablePanel generateTabWithData(HttpRequest httpRequest) {
+            jTabbedPane.removeAll();
+
+            DatatablePanel component = null;
+            List<String> columnNameA = new ArrayList<>();
+            columnNameA.add("Name");
+            for (String i : dataMap.keySet()) {
+                if (i.equals("Value")) {
+                    columnNameA.add("Value");
+                }
+                component = new DatatablePanel(api, db, configLoader, generator, columnNameA, dataMap.get(i), httpRequest, i, DisplayMode.STANDARD);
+                jTabbedPane.addTab(i, component);
+            }
+
+            return component;
+        }
+
+        private Component getComponent(JTabbedPane sourceTabbedPane) {
+            Component selectedComponent = sourceTabbedPane.getSelectedComponent();
+            if (selectedComponent instanceof JTabbedPane) {
+                selectedComponent = ((JTabbedPane) selectedComponent).getSelectedComponent();
+            }
+
+            if (selectedComponent instanceof DatatablePanel) {
+                selectedComponent = ((DatatablePanel) selectedComponent).getDataTable();
+            }
+
+            return selectedComponent;
         }
     }
 }

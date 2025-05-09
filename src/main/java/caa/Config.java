@@ -4,6 +4,11 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class Config {
+    public static String randomType = "Random";
+    public static String alphanumericChars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    public static String allChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    public static int defaultLength = 6;
+
     public static String host = "gh0st.cn";
 
     public static String status = "404";

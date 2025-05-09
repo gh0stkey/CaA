@@ -1,4 +1,4 @@
-package caa.component.utils;
+package caa.utils;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -15,18 +15,6 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 public class UITools {
-    public static ImageIcon getImageIcon(boolean isDark, String filename, int width, int height, int imageStyle) {
-        URL imageURL = null;
-        ClassLoader classLoader = UITools.class.getClassLoader();
-        String iconFileName = String.format("%s%s.png", filename, isDark ? "" : "_black");
-        imageURL = classLoader.getResource(iconFileName);
-        ImageIcon originalIcon = new ImageIcon(imageURL);
-        Image originalImage = originalIcon.getImage();
-        Image scaledImage = originalImage.getScaledInstance(width, height, imageStyle);
-        ImageIcon scaledIcon = new ImageIcon(scaledImage);
-        return scaledIcon;
-    }
-
     public static void addButtonListener(JButton pasteButton, JButton removeButton, JButton clearButton, JTable table, DefaultTableModel model, BiConsumer<String, DefaultTableModel> addDataToTable) {
         pasteButton.addActionListener(e -> {
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();

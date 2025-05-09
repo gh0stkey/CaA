@@ -2,10 +2,11 @@ package caa.component.member;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.requests.HttpRequest;
-import caa.component.utils.UITools;
+import caa.component.generator.Generator;
 import caa.instances.Database;
-import caa.instances.Generator;
+import caa.instances.payload.PayloadGenerator;
 import caa.utils.ConfigLoader;
+import caa.utils.UITools;
 import com.google.common.collect.SetMultimap;
 
 import javax.swing.*;
@@ -22,6 +23,7 @@ import java.awt.event.MouseEvent;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 public class DatatablePanel extends JPanel {
@@ -31,23 +33,31 @@ public class DatatablePanel extends JPanel {
     private final TableRowSorter<DefaultTableModel> sorter;
     private final MontoyaApi api;
     private final ConfigLoader configLoader;
+    private final Generator generator;
     private final JCheckBox searchMode = new JCheckBox("Reverse search");
     private final String tabName;
     private final Object dataObj;
     private final int columnSize;
     private final HttpRequest httpRequest;
     private final Database db;
-    private final Generator generator;
+    private final PayloadGenerator payloadGenerator;
+    private final DisplayMode displayMode;
 
-    public DatatablePanel(MontoyaApi api, Database db, ConfigLoader configLoader, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName) {
+    public DatatablePanel(MontoyaApi api, Database db, ConfigLoader configLoader, Generator generator, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName, boolean flag) {
+        this(api, db, configLoader, generator, columnNameList, dataObj, httpRequest, tabName, flag ? DisplayMode.COUNT : DisplayMode.STANDARD);
+    }
+
+    public DatatablePanel(MontoyaApi api, Database db, ConfigLoader configLoader, Generator generator, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName, DisplayMode displayMode) {
         this.api = api;
         this.db = db;
         this.configLoader = configLoader;
+        this.generator = generator;
         this.tabName = tabName.replace("All ", "");
         this.dataObj = dataObj;
         this.httpRequest = httpRequest;
         this.columnSize = columnNameList.size();
-        this.generator = new Generator(api, configLoader);
+        this.payloadGenerator = new PayloadGenerator(api, configLoader);
+        this.displayMode = displayMode;
 
         String[] columnNames = new String[columnSize + 1];
         columnNames[0] = "#";
@@ -76,15 +86,14 @@ public class DatatablePanel extends JPanel {
         dataTable.setRowSorter(sorter);
         TableColumn idColumn = dataTable.getColumnModel().getColumn(0);
         idColumn.setMaxWidth(50);
-        if (columnSize > 1) {
-            ((SetMultimap<String, String>) dataObj).forEach((k, v) -> {
-                addRowToTable(new Object[]{k, v});
-            });
-        } else {
-            for (String d : (HashSet<String>) dataObj) {
-                addRowToTable(new Object[]{d});
-            }
+
+        if (displayMode == DisplayMode.COUNT) {
+            TableColumn countColumn = dataTable.getColumnModel().getColumn(columnSize);
+            countColumn.setMaxWidth(50);
         }
+
+        populateTableData();
+
 
         // 设置灰色默认文本
         String searchText = "Search";
@@ -143,7 +152,7 @@ public class DatatablePanel extends JPanel {
 
         // 右键快捷方式
         JPopupMenu popupMenu = new JPopupMenu();
-        JMenuItem generatorPayload = new JMenuItem("Send to Payload Generator");
+        JMenuItem sendToGenerator = new JMenuItem("Send to Generator");
         JMenu copyMenu = new JMenu("Copy Payload");
         JMenu rawMenu = new JMenu("Raw");
         JMenuItem rawWithParamCopy = new JMenuItem("Raw with Param");
@@ -160,42 +169,42 @@ public class DatatablePanel extends JPanel {
 
         rawWithParamCopy.addActionListener(e -> {
             String payload = getSelectedDataAtTable(dataTable);
-            setClipboardContents(generator.generateRawParam(payload, "=", "&"));
+            setClipboardContents(payloadGenerator.generateRawParam(payload, "=", "&"));
         });
 
         rawWithCookieCopy.addActionListener(e -> {
             String payload = getSelectedDataAtTable(dataTable);
-            setClipboardContents(generator.generateRawParam(payload, "=", "; "));
+            setClipboardContents(payloadGenerator.generateRawParam(payload, "=", "; "));
         });
 
         rawWithHeaderCopy.addActionListener(e -> {
             String payload = getSelectedDataAtTable(dataTable);
-            setClipboardContents(generator.generateRawParam(payload, ": ","\r\n"));
+            setClipboardContents(payloadGenerator.generateRawParam(payload, ": ", "\r\n"));
         });
 
         jsonCopy.addActionListener(e -> {
             String payload = getSelectedDataAtTable(dataTable);
-            setClipboardContents(generator.generateJsonParam(payload));
+            setClipboardContents(payloadGenerator.generateJsonParam(payload));
         });
 
         xmlCopy.addActionListener(e -> {
             String payload = getSelectedDataAtTable(dataTable);
-            setClipboardContents(generator.generateXmlParam(payload));
+            setClipboardContents(payloadGenerator.generateXmlParam(payload));
         });
 
-        generatorPayload.addActionListener(e -> {
-            String payload = getSelectedDataAtTable(dataTable);
-            new GeneratorDialog(this, api, db, configLoader, httpRequest, tabName, payload);
+        sendToGenerator.addActionListener(e -> {
+            String payloads = getSelectedDataAtTable(dataTable);
+            generator.insertNewTab(httpRequest, tabName, payloads);
         });
 
         dataTable.addMouseListener(new MouseAdapter() {
             public void mouseReleased(MouseEvent e) {
                 if (SwingUtilities.isRightMouseButton(e)) {
-                    if (tabName.equals("Current") || tabName.equals("Param") || tabName.equals("Value")) {
+                    if (tabName.equals("Param") || tabName.equals("Value")) {
                         popupMenu.add(copyMenu);
                     }
                     if (httpRequest != null) {
-                        popupMenu.add(generatorPayload);
+                        popupMenu.add(sendToGenerator);
                     }
                     popupMenu.show(e.getComponent(), e.getX(), e.getY());
                 }
@@ -257,16 +266,57 @@ public class DatatablePanel extends JPanel {
         }
     }
 
+    /**
+     * 填充表格数据
+     */
+    private void populateTableData() {
+        if (displayMode == DisplayMode.COUNT) {
+            if (columnSize > 2) {
+                ((SetMultimap<String, String>) dataObj).forEach((k, v) -> {
+                    // 解析组合的值
+                    String[] parts = v.split("\\|", 2);
+                    String value = parts[1];
+                    int count = Integer.parseInt(parts[0]);
+
+                    addRowToTable(new Object[]{k, value, count});
+                });
+            } else {
+                Map<String, Integer> resultMap = (Map<String, Integer>) dataObj;
+                resultMap.forEach((key, count) -> {
+                    addRowToTable(new Object[]{key, count});
+                });
+            }
+        } else {
+            if (columnSize > 1) {
+                ((SetMultimap<String, String>) dataObj).forEach((k, v) -> {
+                    addRowToTable(new Object[]{k, v});
+                });
+            } else {
+                for (String d : (HashSet<String>) dataObj) {
+                    addRowToTable(new Object[]{d});
+                }
+            }
+        }
+    }
+
     public String getSelectedDataAtTable(JTable table) {
         int[] selectRows = table.getSelectedRows();
         StringBuilder selectData = new StringBuilder();
 
         for (int row : selectRows) {
             int columnCount = table.getColumnCount();
-            switch (columnCount) {
-                case 2 -> selectData.append(table.getValueAt(row, 1).toString()).append("\r\n");
-                case 3 ->
-                        selectData.append(String.format("%s=%s", table.getValueAt(row, 1).toString(), encodeParameter(table.getValueAt(row, 2).toString()))).append("\r\n");
+            if (displayMode == DisplayMode.COUNT) {
+                switch (columnCount) {
+                    case 3 -> selectData.append(table.getValueAt(row, 1).toString()).append("\r\n");
+                    case 4 ->
+                            selectData.append(String.format("%s=%s", table.getValueAt(row, 1).toString(), table.getValueAt(row, 2).toString())).append("\r\n");
+                }
+            } else {
+                switch (columnCount) {
+                    case 2 -> selectData.append(table.getValueAt(row, 1).toString()).append("\r\n");
+                    case 3 ->
+                            selectData.append(String.format("%s=%s", table.getValueAt(row, 1).toString(), table.getValueAt(row, 2).toString())).append("\r\n");
+                }
             }
         }
 
@@ -277,14 +327,6 @@ public class DatatablePanel extends JPanel {
         }
 
         return selectData.toString();
-    }
-
-    public String encodeParameter(String input) {
-        try {
-            input = api.utilities().urlUtils().encode(input);
-        } catch (Exception ignored) {
-        }
-        return input;
     }
 
     public JTable getDataTable() {

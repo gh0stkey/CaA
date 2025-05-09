@@ -7,7 +7,7 @@ import burp.api.montoya.intruder.PayloadGeneratorProvider;
 public class CaAPayloadGeneratorProvider implements PayloadGeneratorProvider {
     @Override
     public String displayName() {
-        return "CaA - Payload Generator";
+        return "CaA Payload Generator";
     }
 
     @Override

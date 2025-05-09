@@ -2,10 +2,6 @@ package caa.utils;
 
 import java.security.MessageDigest;
 
-/**
- * @author EvilChen
- */
-
 public class HashCalculator {
     public static String calculateHash(byte[] bytes) {
         MessageDigest digest;

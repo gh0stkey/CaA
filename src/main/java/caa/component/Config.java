@@ -1,13 +1,12 @@
 package caa.component;
 
 import burp.api.montoya.MontoyaApi;
-import caa.component.utils.UITools;
 import caa.utils.ConfigLoader;
+import caa.utils.UITools;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
-import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -23,6 +22,7 @@ public class Config extends JPanel {
     private final MontoyaApi api;
     private final ConfigLoader configLoader;
     private final String defaultText = "Enter a new item";
+    private boolean isLoadingData = false;
 
     public Config(MontoyaApi api, ConfigLoader configLoader) {
         this.api = api;
@@ -83,53 +83,58 @@ public class Config extends JPanel {
         return scopePanel;
     }
 
-    private TableModelListener craeteSettingTableModelListener(JComboBox<String> setTypeComboBox, DefaultTableModel model) {
-        return new TableModelListener() {
-            @Override
-            public void tableChanged(TableModelEvent e) {
-                String selected = (String) setTypeComboBox.getSelectedItem();
-                String values = getFirstColumnDataAsString(model);
+    private TableModelListener createSettingTableModelListener(JComboBox<String> setTypeComboBox, DefaultTableModel model) {
+        return e -> {
+            // 如果是程序正在加载数据，不处理事件
+            if (isLoadingData) {
+                return;
+            }
 
-                if (selected.equals("Exclude suffix")) {
-                    if (!values.equals(configLoader.getExcludeSuffix()) && !values.isEmpty()) {
-                        configLoader.setExcludeSuffix(values);
-                    }
+            String selected = (String) setTypeComboBox.getSelectedItem();
+            String values = getFirstColumnDataAsString(model);
+
+            if (selected.equals("Exclude suffix")) {
+                if (!values.equals(configLoader.getExcludeSuffix())) {
+                    configLoader.setExcludeSuffix(values);
                 }
+            }
 
-                if (selected.equals("Block host")) {
-                    if (!values.equals(configLoader.getBlockHost()) && !values.isEmpty()) {
-                        configLoader.setBlockHost(values);
-                    }
+            if (selected.equals("Block host")) {
+                if (!values.equals(configLoader.getBlockHost())) {
+                    configLoader.setBlockHost(values);
                 }
+            }
 
-                if (selected.equals("Exclude status")) {
-                    if (!values.equals(configLoader.getExcludeStatus()) && !values.isEmpty()) {
-                        configLoader.setExcludeStatus(values);
-                    }
+            if (selected.equals("Exclude status")) {
+                if (!values.equals(configLoader.getExcludeStatus())) {
+                    configLoader.setExcludeStatus(values);
                 }
             }
         };
     }
 
     private ActionListener createSettingActionListener(JComboBox<String> setTypeComboBox, DefaultTableModel model) {
-        return new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String selected = (String) setTypeComboBox.getSelectedItem();
-                model.setRowCount(0);
+        return e -> {
+            String selected = (String) setTypeComboBox.getSelectedItem();
 
-                if (selected.equals("Exclude suffix")) {
-                    addDataToTable(configLoader.getExcludeSuffix().replaceAll("\\|", "\r\n"), model);
-                }
+            // 设置标志，表示正在加载数据
+            isLoadingData = true;
+            model.setRowCount(0);
 
-                if (selected.equals("Block host")) {
-                    addDataToTable(configLoader.getBlockHost().replaceAll("\\|", "\r\n"), model);
-                }
-
-                if (selected.equals("Exclude status")) {
-                    addDataToTable(configLoader.getExcludeStatus().replaceAll("\\|", "\r\n"), model);
-                }
+            if (selected.equals("Exclude suffix")) {
+                addDataToTable(configLoader.getExcludeSuffix().replaceAll("\\|", "\r\n"), model);
             }
+
+            if (selected.equals("Block host")) {
+                addDataToTable(configLoader.getBlockHost().replaceAll("\\|", "\r\n"), model);
+            }
+
+            if (selected.equals("Exclude status")) {
+                addDataToTable(configLoader.getExcludeStatus().replaceAll("\\|", "\r\n"), model);
+            }
+
+            // 重置标志
+            isLoadingData = false;
         };
     }
 
@@ -168,7 +173,7 @@ public class Config extends JPanel {
 
         setTypeComboBox.setSelectedItem(mode[0]);
 
-        model.addTableModelListener(craeteSettingTableModelListener(setTypeComboBox, model));
+        model.addTableModelListener(createSettingTableModelListener(setTypeComboBox, model));
 
         constraints.insets = new Insets(0, 0, 3, 0);
         constraints.gridy = 0;
@@ -245,15 +250,15 @@ public class Config extends JPanel {
         String boxText = checkBox.getText();
         boolean selected = checkBox.isSelected();
 
-        Set<String> CaAScope = new HashSet<>(Arrays.asList(configLoader.getScope().split("\\|")));
+        Set<String> scope = new HashSet<>(Arrays.asList(configLoader.getScope().split("\\|")));
 
         if (selected) {
-            CaAScope.add(boxText);
+            scope.add(boxText);
         } else {
-            CaAScope.remove(boxText);
+            scope.remove(boxText);
         }
 
-        configLoader.setScope(String.join("|", CaAScope));
+        configLoader.setScope(String.join("|", scope));
     }
 
     private void addActionPerformed(ActionEvent e, DefaultTableModel model, JTextField addTextField) {

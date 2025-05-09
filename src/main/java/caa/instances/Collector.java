@@ -55,6 +55,43 @@ public class Collector implements ScanCheck {
         this.httpUtils = new HttpUtils(api, configLoader);
     }
 
+    public static Map<String, Object> getJsonData(String responseBody) {
+        String hashIndex = HashCalculator.calculateHash(responseBody.getBytes());
+        Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
+
+        if (cachePool != null) {
+            return cachePool;
+        } else {
+            // 遍历JSON Keys
+            try {
+                JsonTraverser jsonTraverser = new JsonTraverser();
+                jsonTraverser.foreachJsonKey(JsonParser.parseString(responseBody).getAsJsonObject());
+
+                Map<String, Object> collectMap = new HashMap<>();
+                Set<String> paramList = new LinkedHashSet<>(jsonTraverser.getJsonKeys());
+                SetMultimap<String, String> paramValueMap = jsonTraverser.getJsonKeyValues();
+
+                if (paramValueMap != null && paramValueMap.size() > 0) {
+                    collectMap.put("jsonKeyValue", paramValueMap);
+                }
+
+                if (paramList.size() > 0) {
+                    collectMap.put("jsonKey", paramList);
+                }
+
+                if (collectMap.size() > 0) {
+                    CachePool.addToCache(hashIndex, collectMap);
+                    return collectMap;
+                } else {
+                    return null;
+                }
+
+            } catch (Exception e) {
+                return null;
+            }
+        }
+    }
+
     @Override
     public AuditResult activeAudit(HttpRequestResponse baseRequestResponse, AuditInsertionPoint auditInsertionPoint) {
         return auditResult(emptyList());
@@ -126,89 +163,86 @@ public class Collector implements ScanCheck {
                 }
 
                 if (response != null) {
-                    if (response.statusCode() != 404) {
-                        ByteArray responseBodyBytes = response.body();
-                        String hashIndex = HashCalculator.calculateHash(responseBodyBytes.getBytes());
-                        Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
+                    ByteArray responseBodyBytes = response.body();
+                    String hashIndex = HashCalculator.calculateHash(responseBodyBytes.getBytes());
+                    Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
 
-                        if (cachePool == null) {
-                            // -----------------处理响应报文-----------------
-                            try {
-                                // 获取响应报文的主体内容
-                                String responseBody = new String(responseBodyBytes.getBytes(), StandardCharsets.UTF_8);
+                    if (cachePool == null) {
+                        // -----------------处理响应报文-----------------
+                        try {
+                            // 获取响应报文的主体内容
+                            String responseBody = new String(responseBodyBytes.getBytes(), StandardCharsets.UTF_8);
 
-                                Map<String, Object> jsonData = getJsonData(responseBody);
+                            Map<String, Object> jsonData = getJsonData(responseBody);
 
-                                if (jsonData != null) {
-                                    processJsonData(jsonData);
-                                } else {
-                                    // 尝试对HTML程序进行解析
-                                    Document doc = Jsoup.parse(responseBody);
-                                    Elements inputTags = doc.getElementsByTag("input");
+                            if (jsonData != null) {
+                                processJsonData(jsonData);
+                            } else {
+                                // 尝试对HTML程序进行解析
+                                Document doc = Jsoup.parse(responseBody);
+                                Elements inputTags = doc.getElementsByTag("input");
 
-                                    for (Element inputTag : inputTags) {
-                                        String type = inputTag.attr("type");
+                                for (Element inputTag : inputTags) {
+                                    String type = inputTag.attr("type");
 
-                                        if ("hidden".equals(type)) {
-                                            String name = inputTag.attr("name");
-                                            if (name == null || name.isBlank()) {
-                                                name = inputTag.attr("id");
-                                            }
+                                    if ("hidden".equals(type) || "text".equals(type)) {
+                                        String name = inputTag.attr("name");
+                                        if (name == null || name.isBlank()) {
+                                            name = inputTag.attr("id");
+                                        }
 
-                                            if (name != null && !name.isBlank() && name.matches("[\\w\\-\\.]+")) {
-                                                String value = inputTag.attr("value");
-                                                paramList.add(name);
-                                                if (value != null && !value.isBlank()) {
-                                                    valueList.put(name, value);
-                                                }
+                                        if (name != null && !name.isBlank() && name.matches("[\\w\\-\\.]+")) {
+                                            String value = inputTag.attr("value");
+                                            paramList.add(name);
+                                            if (value != null && !value.isBlank()) {
+                                                valueList.put(name, value);
                                             }
                                         }
                                     }
                                 }
-                            } catch (Exception ignored) {
                             }
-
-                            // 存储结果到内存中
-                            Map<String, Object> collectMap = new HashMap<>();
-
-                            if (!pathList.isEmpty()) {
-                                collectMap.put("Path", pathList);
-                                collectMap.put("All Path", pathList);
-                            }
-                            if (!fullPathList.isEmpty()) {
-                                collectMap.put("FullPath", fullPathList);
-                                collectMap.put("All FullPath", fullPathList);
-                            }
-                            if (!fileList.isEmpty()) {
-                                collectMap.put("File", fileList);
-                                collectMap.put("All File", fileList);
-                            }
-                            if (!paramList.isEmpty()) {
-                                collectMap.put("Param", paramList);
-                                collectMap.put("All Param", paramList);
-                            }
-                            if (!valueList.isEmpty()) {
-                                collectMap.put("Value", valueList);
-                            }
-
-                            if (!collectMap.isEmpty()) {
-                                String finalHost = host.toLowerCase();
-                                CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> {
-                                    db.insertData(finalHost, collectMap);
-                                    return null;
-                                });
-                            }
-
-                        } else {
-                            valueList.putAll((SetMultimap) cachePool.get("jsonKeyValue"));
-                            paramList.addAll((HashSet) cachePool.get("jsonKey"));
+                        } catch (Exception ignored) {
                         }
+
+                        // 存储结果到内存中
+                        Map<String, Object> collectMap = new HashMap<>();
+
+                        if (!pathList.isEmpty()) {
+                            collectMap.put("Path", pathList);
+                            collectMap.put("All Path", pathList);
+                        }
+                        if (!fullPathList.isEmpty()) {
+                            collectMap.put("FullPath", fullPathList);
+                            collectMap.put("All FullPath", fullPathList);
+                        }
+                        if (!fileList.isEmpty()) {
+                            collectMap.put("File", fileList);
+                            collectMap.put("All File", fileList);
+                        }
+                        if (!paramList.isEmpty()) {
+                            collectMap.put("Param", paramList);
+                            collectMap.put("All Param", paramList);
+                        }
+                        if (!valueList.isEmpty()) {
+                            collectMap.put("Value", valueList);
+                        }
+
+                        if (!collectMap.isEmpty()) {
+                            String finalHost = host.toLowerCase();
+                            CompletableFuture.supplyAsync(() -> {
+                                db.insertData(finalHost, collectMap);
+                                return null;
+                            });
+                        }
+
+                    } else {
+                        valueList.putAll((SetMultimap) cachePool.get("jsonKeyValue"));
+                        paramList.addAll((HashSet) cachePool.get("jsonKey"));
                     }
                 }
             }
 
             putCurrentDataToMap();
-            getDataToMap(host);
         }
 
         if (request == null && response != null) {
@@ -227,34 +261,16 @@ public class Collector implements ScanCheck {
     }
 
     private void putCurrentDataToMap() {
-        if (paramList.size() > 0) {
-            dataMap.put("Current Param", paramList);
+        if (!paramList.isEmpty()) {
+            dataMap.put("Param", paramList);
         }
-        if (valueList.size() > 0) {
-            dataMap.put("Current Value", valueList);
-        }
-    }
 
-    private void getDataToMap(String host) {
-        Object pathData = db.selectData(host, "Path", "");
-        if (pathData != null) {
-            dataMap.put("Path", pathData);
+        if (!valueList.isEmpty()) {
+            dataMap.put("Value", valueList);
         }
-        Object allPathData = db.selectData(host, "FullPath", "");
-        if (pathData != null) {
-            dataMap.put("FullPath", allPathData);
-        }
-        Object fileData = db.selectData(host, "File", "");
-        if (fileData != null) {
-            dataMap.put("File", fileData);
-        }
-        Object paramData = db.selectData(host, "Param", "");
-        if (paramData != null) {
-            dataMap.put("Param", paramData);
-        }
-        Object valueData = db.selectData(host, "Value", "");
-        if (valueData != null) {
-            dataMap.put("Value", valueData);
+
+        if (!pathList.isEmpty()) {
+            dataMap.put("Path", pathList);
         }
     }
 
@@ -267,43 +283,6 @@ public class Collector implements ScanCheck {
 
         if (jsonKey != null) {
             paramList.addAll((HashSet) jsonKey);
-        }
-    }
-
-    public static Map<String, Object> getJsonData(String responseBody) {
-        String hashIndex = HashCalculator.calculateHash(responseBody.getBytes());
-        Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
-
-        if (cachePool != null) {
-            return cachePool;
-        } else {
-            // 遍历JSON Keys
-            try {
-                JsonTraverser jsonTraverser = new JsonTraverser();
-                jsonTraverser.foreachJsonKey(JsonParser.parseString(responseBody).getAsJsonObject());
-
-                Map<String, Object> collectMap = new HashMap<>();
-                Set<String> paramList = new LinkedHashSet<>(jsonTraverser.getJsonKeys());
-                SetMultimap<String, String> paramValueMap = jsonTraverser.getJsonKeyValues();
-
-                if (paramValueMap != null && paramValueMap.size() > 0) {
-                    collectMap.put("jsonKeyValue", paramValueMap);
-                }
-
-                if (paramList.size() > 0) {
-                    collectMap.put("jsonKey", paramList);
-                }
-
-                if (collectMap.size() > 0) {
-                    CachePool.addToCache(hashIndex, collectMap);
-                    return collectMap;
-                } else {
-                    return null;
-                }
-
-            } catch (Exception e) {
-                return null;
-            }
         }
     }
 

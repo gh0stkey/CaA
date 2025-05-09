@@ -6,10 +6,6 @@ import com.google.common.collect.SetMultimap;
 
 import java.util.*;
 
-/**
- * @author EvilChen
- */
-
 public class CachePool {
 
     private static final Map<String, Map<String, Object>> cache = new HashMap<>();

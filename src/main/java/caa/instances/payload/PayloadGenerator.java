@@ -1,4 +1,4 @@
-package caa.instances;
+package caa.instances.payload;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.params.HttpParameter;
@@ -6,7 +6,6 @@ import burp.api.montoya.http.message.params.HttpParameterType;
 import burp.api.montoya.http.message.params.ParsedHttpParameter;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.requests.HttpTransformation;
-import burp.api.montoya.utilities.RandomUtils;
 import caa.Config;
 import caa.utils.ConfigLoader;
 import caa.utils.HttpUtils;
@@ -19,19 +18,19 @@ import com.google.gson.JsonObject;
 import java.text.MessageFormat;
 import java.util.*;
 
-public class Generator {
+public class PayloadGenerator {
     private final MontoyaApi api;
     private final ConfigLoader configLoader;
     private final HttpUtils httpUtils;
 
-    public Generator(MontoyaApi api, ConfigLoader configLoader) {
+    public PayloadGenerator(MontoyaApi api, ConfigLoader configLoader) {
         this.api = api;
         this.configLoader = configLoader;
         this.httpUtils = new HttpUtils(api, configLoader);
     }
 
-    public boolean generateRequest(HttpRequest request, String payload, String payloadMode, int randomStringFlag, int randomStringLength) {
-        Object payloadObj = null;
+    public boolean generateRequest(HttpRequest request, String payload, String payloadMode, String valueType, String valueInput, int randomStringLength) {
+        Object payloadObj;
 
         if (payload.contains("=")) {
             List<String> dataList = Arrays.stream(payload.split("\r\n")).toList();
@@ -48,7 +47,7 @@ public class Generator {
         List<HttpRequest> requestList = new ArrayList<>();
         switch (payloadMode) {
             case "Param", "Value", "Current" ->
-                    requestList = generateParamAndValueWithRequest(request, payloadObj, randomStringFlag, randomStringLength);
+                    requestList = generateParamAndValueWithRequest(request, payloadObj, valueType, valueInput, randomStringLength);
             case "FullPath", "Path", "File" ->
                     requestList = generateEndpointWithRequest(request, (List<String>) payloadObj);
         }
@@ -79,14 +78,14 @@ public class Generator {
         return httpRequest;
     }
 
-    private List<HttpRequest> generateParamAndValueWithRequest(HttpRequest originalRequest, Object payloadObj, int randomStringFlag, int randomStringLength) {
+    private List<HttpRequest> generateParamAndValueWithRequest(HttpRequest originalRequest, Object payloadObj, String valueType, String valueInput, int valueLength) {
         SetMultimap<String, String> paramValueMap = LinkedHashMultimap.create();
         List<HttpRequest> requestList = new ArrayList<>();
 
         if (payloadObj instanceof List) {
             List<String> paramList = (List) payloadObj;
             for (int i = 0; i < paramList.size(); i++) {
-                paramValueMap.put(paramList.get(i), generateRandomString(randomStringLength, randomStringFlag));
+                paramValueMap.put(paramList.get(i), generateRandomString(valueType, valueInput, valueLength));
             }
         } else {
             paramValueMap.putAll((SetMultimap) payloadObj);
@@ -222,7 +221,7 @@ public class Generator {
     }
 
     private HttpRequest generateRequestByMultipartMethod(HttpRequest httpRequest) {
-        String boundary = generateRandomString(32, 1);
+        String boundary = generateRandomString(Config.randomType, Config.allChars, 32);
         StringBuilder newBody = new StringBuilder();
 
         List<ParsedHttpParameter> parameterList = httpRequest.parameters();
@@ -239,8 +238,12 @@ public class Generator {
         return httpRequest;
     }
 
-    private String generateRandomString(int length, int strFlag) {
-        return this.api.utilities().randomUtils().randomString(length, strFlag == 1 ? RandomUtils.CharacterSet.ASCII_LETTERS : RandomUtils.CharacterSet.DIGITS);
+    private String generateRandomString(String valueType, String valueInput, int valueLength) {
+        if (valueType.equals("Random")) {
+            return this.api.utilities().randomUtils().randomString(valueLength, valueInput);
+        } else {
+            return valueInput;
+        }
     }
 
     public String generateRawParam(String payload, String formatChar, String delimiter) {
@@ -254,7 +257,7 @@ public class Generator {
             }
         } else {
             for (String param : payload.split("\r\n")) {
-                paramValueList.add(MessageFormat.format(formatString, param, formatChar, generateRandomString(6, 1)));
+                paramValueList.add(MessageFormat.format(formatString, param, formatChar, generateRandomString(Config.randomType, Config.alphanumericChars, Config.defaultLength)));
             }
         }
         return String.join(delimiter, paramValueList);
@@ -270,7 +273,7 @@ public class Generator {
             }
         } else {
             for (String param : payload.split("\r\n")) {
-                jsonObject.addProperty(param, generateRandomString(6, 1));
+                jsonObject.addProperty(param, generateRandomString(Config.randomType, Config.alphanumericChars, Config.defaultLength));
             }
         }
         return new Gson().toJson(jsonObject);
@@ -287,7 +290,7 @@ public class Generator {
             }
         } else {
             for (String param : payload.split("\r\n")) {
-                paramValueList.add(MessageFormat.format(formatString, param, generateRandomString(5, 1)));
+                paramValueList.add(MessageFormat.format(formatString, param, generateRandomString(Config.randomType, Config.alphanumericChars, Config.defaultLength)));
             }
         }
         return String.join("", paramValueList);
