@@ -309,13 +309,13 @@ public class DatatablePanel extends JPanel {
                 switch (columnCount) {
                     case 3 -> selectData.append(table.getValueAt(row, 1).toString()).append("\r\n");
                     case 4 ->
-                            selectData.append(String.format("%s=%s", table.getValueAt(row, 1).toString(), table.getValueAt(row, 2).toString())).append("\r\n");
+                            selectData.append(String.format("%s=%s", table.getValueAt(row, 1).toString(), encodeParameter(table.getValueAt(row, 2).toString()))).append("\r\n");
                 }
             } else {
                 switch (columnCount) {
                     case 2 -> selectData.append(table.getValueAt(row, 1).toString()).append("\r\n");
                     case 3 ->
-                            selectData.append(String.format("%s=%s", table.getValueAt(row, 1).toString(), table.getValueAt(row, 2).toString())).append("\r\n");
+                            selectData.append(String.format("%s=%s", table.getValueAt(row, 1).toString(), encodeParameter(table.getValueAt(row, 2).toString()))).append("\r\n");
                 }
             }
         }
@@ -327,6 +327,14 @@ public class DatatablePanel extends JPanel {
         }
 
         return selectData.toString();
+    }
+
+    public String encodeParameter(String input) {
+        try {
+            input = api.utilities().urlUtils().encode(input);
+        } catch (Exception ignored) {
+        }
+        return input;
     }
 
     public JTable getDataTable() {
