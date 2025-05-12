@@ -26,6 +26,10 @@ public class HttpUtils {
         return original;
     }
 
+    public static boolean matchHostIsIp(String host) {
+        return host.matches("\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b");
+    }
+
     public static boolean matchFromEnd(String input, String pattern) {
         int inputLength = input.length();
         int patternLength = pattern.length();

@@ -7,6 +7,7 @@ import caa.component.member.DatatablePanel;
 import caa.component.member.DisplayMode;
 import caa.instances.Database;
 import caa.utils.ConfigLoader;
+import caa.utils.HttpUtils;
 import caa.utils.UITools;
 
 import javax.swing.*;
@@ -238,6 +239,30 @@ public class Databoard extends JPanel {
 
         // 缓存中没有，则查询数据库
         List<String> hosts = db.getAllHosts(tableName);
+        hosts = new ArrayList<>(new HashSet<>(hosts)); // 去重
+
+        // 用于暂存新生成的 anyHost
+        List<String> newAnyHosts = new ArrayList<>();
+
+        // 添加通配符Host
+        for (String host : hosts) {
+            if (!HttpUtils.matchHostIsIp(host)) {
+                String[] splitHost = host.split("\\.");
+                if (splitHost.length > 2) {
+                    String anyHost = HttpUtils.replaceFirstOccurrence(host, splitHost[0], "*");
+                    if (!anyHost.isEmpty()) {
+                        newAnyHosts.add(anyHost);
+                    }
+                }
+            }
+        }
+
+        // 统一添加所有新生成的 anyHost
+        hosts.addAll(newAnyHosts);
+
+        // 再次去重
+        hosts = new ArrayList<>(new HashSet<>(hosts));
+
         hostCache.put(tableName, hosts);
         return hosts;
     }
