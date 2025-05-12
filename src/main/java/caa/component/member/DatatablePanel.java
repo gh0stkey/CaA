@@ -85,15 +85,16 @@ public class DatatablePanel extends JPanel {
 
         dataTable.setRowSorter(sorter);
         TableColumn idColumn = dataTable.getColumnModel().getColumn(0);
-        idColumn.setMaxWidth(50);
+        idColumn.setPreferredWidth(50);
+        idColumn.setMaxWidth(100);
 
         if (displayMode == DisplayMode.COUNT) {
             TableColumn countColumn = dataTable.getColumnModel().getColumn(columnSize);
-            countColumn.setMaxWidth(50);
+            countColumn.setPreferredWidth(50);
+            countColumn.setMaxWidth(150);
         }
 
         populateTableData();
-
 
         // 设置灰色默认文本
         String searchText = "Search";
