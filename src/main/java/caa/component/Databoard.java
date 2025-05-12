@@ -192,6 +192,7 @@ public class Databoard extends JPanel {
                     @Override
                     protected Object doInBackground() {
                         String limitSize = limitComboBox.getSelectedItem().toString();
+                        dataPanel.removeAll();
                         return db.selectData(selectedHost.equals("*") ? "" : selectedHost, tableName, limitSize);
                     }
 
@@ -226,8 +227,6 @@ public class Databoard extends JPanel {
 
                 handleComboBoxWorker.execute();
             }
-
-
         }
     }
 
