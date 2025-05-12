@@ -25,7 +25,7 @@ public class CaA implements BurpExtension {
         // 加载扩展后输出的项目信息
         Logging logging = api.logging();
         logging.logToOutput("[ HACK THE WORLD - TO DO IT ]");
-        logging.logToOutput("[#] Author: EvilChen && 0chencc");
+        logging.logToOutput("[#] Author: EvilChen && 0chencc && MingXi");
         logging.logToOutput("[#] Github: https://github.com/gh0stkey/CaA");
         logging.logToOutput("[#] Version: " + version);
 
