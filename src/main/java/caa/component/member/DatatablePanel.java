@@ -43,10 +43,6 @@ public class DatatablePanel extends JPanel {
     private final PayloadGenerator payloadGenerator;
     private final DisplayMode displayMode;
 
-    public DatatablePanel(MontoyaApi api, Database db, ConfigLoader configLoader, Generator generator, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName, boolean flag) {
-        this(api, db, configLoader, generator, columnNameList, dataObj, httpRequest, tabName, flag ? DisplayMode.COUNT : DisplayMode.STANDARD);
-    }
-
     public DatatablePanel(MontoyaApi api, Database db, ConfigLoader configLoader, Generator generator, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName, DisplayMode displayMode) {
         this.api = api;
         this.db = db;
@@ -83,7 +79,6 @@ public class DatatablePanel extends JPanel {
             }
         });
 
-        dataTable.setRowSorter(sorter);
         TableColumn idColumn = dataTable.getColumnModel().getColumn(0);
         idColumn.setPreferredWidth(50);
         idColumn.setMaxWidth(100);
@@ -92,8 +87,16 @@ public class DatatablePanel extends JPanel {
             TableColumn countColumn = dataTable.getColumnModel().getColumn(columnSize);
             countColumn.setPreferredWidth(50);
             countColumn.setMaxWidth(150);
+
+            sorter.setComparator(columnSize, new Comparator<Integer>() {
+                @Override
+                public int compare(Integer s1, Integer s2) {
+                    return s1.compareTo(s2);
+                }
+            });
         }
 
+        dataTable.setRowSorter(sorter);
         populateTableData();
 
         // 设置灰色默认文本

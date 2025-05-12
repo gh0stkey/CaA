@@ -53,6 +53,37 @@ public class Database {
         }
     }
 
+    private static String getSql(String tableName, String limitSize, boolean isLikeQuery) {
+        String sql;
+        // 模糊查询
+        if (isLikeQuery) {
+            sql = "SELECT name%s,SUM(count) AS count FROM `" + tableName + "` %s GROUP BY name%s HAVING COUNT(*) > 0 ORDER BY count DESC";
+        } else {
+            sql = "SELECT name%s,count FROM `" + tableName + "` %s ORDER BY count DESC";
+        }
+
+        if (!limitSize.isBlank()) {
+            sql += " LIMIT " + limitSize;
+        }
+
+        if (tableName.contains("All")) {
+            sql = String.format(sql, "", "");
+        } else if (tableName.equals("Value")) {
+            if (isLikeQuery) {
+                sql = String.format(sql, ",value", "WHERE host like ?", ",value");
+            } else {
+                sql = String.format(sql, ",value", "WHERE host = ?");
+            }
+        } else {
+            if (isLikeQuery) {
+                sql = String.format(sql, "", "WHERE host like ?", "");
+            } else {
+                sql = String.format(sql, "", "WHERE host = ?");
+            }
+        }
+        return sql;
+    }
+
     public Object selectData(String host, String tableName, String limitSize) {
         try {
             if (!connection.isClosed()) {
@@ -105,37 +136,6 @@ public class Database {
         }
 
         return null;
-    }
-
-    private static String getSql(String tableName, String limitSize, boolean isLikeQuery) {
-        String sql;
-        // 模糊查询
-        if (isLikeQuery) {
-            sql = "SELECT name%s,SUM(count) AS count FROM `" + tableName + "` %s GROUP BY name%s HAVING COUNT(*) > 0 ORDER BY count DESC";
-        } else {
-            sql = "SELECT name%s,count FROM `" + tableName + "` %s ORDER BY count DESC";
-        }
-
-        if (!limitSize.isBlank()) {
-            sql += " LIMIT " + limitSize;
-        }
-
-        if (tableName.contains("All")) {
-            sql = String.format(sql, "", "");
-        } else if (tableName.equals("Value")) {
-            if (isLikeQuery) {
-                sql = String.format(sql, ",value", "WHERE host like ?", ",value");
-            } else {
-                sql = String.format(sql, ",value", "WHERE host = ?");
-            }
-        } else {
-            if (isLikeQuery) {
-                sql = String.format(sql, "", "WHERE host like ?", "");
-            } else {
-                sql = String.format(sql, "", "WHERE host = ?");
-            }
-        }
-        return sql;
     }
 
     private void createTables() {

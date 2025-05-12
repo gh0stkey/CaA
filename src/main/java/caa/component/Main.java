@@ -4,12 +4,9 @@ import burp.api.montoya.MontoyaApi;
 import caa.component.generator.Generator;
 import caa.instances.Database;
 import caa.utils.ConfigLoader;
-import caa.utils.UITools;
 
 import javax.swing.*;
 import java.awt.*;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.net.URL;
 
 public class Main extends JPanel {
