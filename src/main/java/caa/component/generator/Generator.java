@@ -124,13 +124,13 @@ public class Generator extends JTabbedPane {
     }
 
     private void insertNewTab() {
-        insertTab(String.valueOf(newTabIndex), null, new GeneratorTab(api, configLoader, HttpRequest.httpRequestFromUrl("http://localhost:80"), "Param", "id"), null, getTabCount() - 1);
+        insertTab(String.valueOf(newTabIndex), null, new Tab(api, configLoader, HttpRequest.httpRequestFromUrl("http://localhost:80"), "Param", "id"), null, getTabCount() - 1);
         setSelectedIndex(getTabCount() - 2);
         newTabIndex++;
     }
 
     public void insertNewTab(HttpRequest request, String payloadType, String payloads) {
-        insertTab(String.valueOf(newTabIndex), null, new GeneratorTab(api, configLoader, request, payloadType, payloads), null, getTabCount() - 1);
+        insertTab(String.valueOf(newTabIndex), null, new Tab(api, configLoader, request, payloadType, payloads), null, getTabCount() - 1);
         setSelectedIndex(getTabCount() - 2);
         newTabIndex++;
     }

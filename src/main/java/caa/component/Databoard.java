@@ -2,13 +2,13 @@ package caa.component;
 
 import burp.api.montoya.MontoyaApi;
 import caa.Config;
+import caa.component.datatable.Datatable;
+import caa.component.datatable.Mode;
 import caa.component.generator.Generator;
-import caa.component.member.DatatablePanel;
-import caa.component.member.DisplayMode;
 import caa.instances.Database;
 import caa.utils.ConfigLoader;
 import caa.utils.HttpUtils;
-import caa.utils.UITools;
+import caa.utils.UIEnhancer;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -18,11 +18,11 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 
 public class Databoard extends JPanel {
-    private static Boolean isMatchHost = false;
+    private boolean isMatchHost = false;
 
     private final MontoyaApi api;
     private final Database db;
@@ -43,7 +43,11 @@ public class Databoard extends JPanel {
     private final ActionListener actionListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            String selected = tableComboBox.getSelectedItem().toString();
+            Object selectedItem = tableComboBox.getSelectedItem();
+            if (selectedItem == null) {
+                return;
+            }
+            String selected = selectedItem.toString();
             dataPanel.removeAll();
 
             if (selected.contains("All")) {
@@ -52,11 +56,13 @@ public class Databoard extends JPanel {
             } else {
                 hostTextField.setEnabled(true);
                 String host = hostTextField.getText();
-                if (host.equals("*")) {
-                    hostTextField.setText("");
-                    hostTextField.setForeground(Color.BLACK);
-                } else if (hostTextField.getForeground().equals(Color.BLACK)) {
-                    handleComboBoxAction(null, host);
+                if (host != null) {
+                    if (host.equals("*")) {
+                        hostTextField.setText("");
+                        hostTextField.setForeground(Color.BLACK);
+                    } else if (hostTextField.getForeground().equals(Color.BLACK)) {
+                        handleComboBoxAction(null, host);
+                    }
                 }
             }
         }
@@ -99,7 +105,7 @@ public class Databoard extends JPanel {
         hostTextField.setText(defaultText);
         hostTextField.setForeground(Color.GRAY);
 
-        UITools.setTextFieldPlaceholder(hostTextField, defaultText);
+        UIEnhancer.setTextFieldPlaceholder(hostTextField, defaultText);
 
         dataPanel = new JPanel();
         dataPanel.setLayout(new BorderLayout());
@@ -146,11 +152,21 @@ public class Databoard extends JPanel {
     private void filterComboBoxList() {
         isMatchHost = true;
         comboBoxModel.removeAllElements();
-        String tableName = tableComboBox.getSelectedItem().toString();
-        String input = hostTextField.getText().toLowerCase();
+        Object tableItem = tableComboBox.getSelectedItem();
+        if (tableItem == null) {
+            isMatchHost = false;
+            return;
+        }
+        String tableName = tableItem.toString();
+        String input = hostTextField.getText();
+        if (input == null) {
+            isMatchHost = false;
+            return;
+        }
+        input = input.toLowerCase();
 
         if (!input.isEmpty() && !input.equals("*")) {
-            for (String host : getHostByList(tableName)) {
+            for (String host : getHostByList(tableName, input)) {
                 String lowerCaseHost = host.toLowerCase();
                 if (lowerCaseHost.contains(input)) {
                     if (lowerCaseHost.equals(input)) {
@@ -171,13 +187,17 @@ public class Databoard extends JPanel {
 
     private void handleComboBoxAction(ActionEvent e, String host) {
         if (!isMatchHost) {
-            String tableName = tableComboBox.getSelectedItem().toString();
+            Object tableItem = tableComboBox.getSelectedItem();
+            if (tableItem == null) {
+                return;
+            }
+            String tableName = tableItem.toString();
             String selectedHost;
             Object selectedItem = hostComboBox.getSelectedItem();
 
             if (host.equals("*")) {
                 selectedHost = "*";
-            } else if (getHostByList(tableName).contains(selectedItem.toString())) {
+            } else if (selectedItem != null && getHostByList(tableName, selectedItem.toString()).contains(selectedItem.toString())) {
                 selectedHost = selectedItem.toString();
             } else {
                 selectedHost = "";
@@ -207,19 +227,20 @@ public class Databoard extends JPanel {
                                     columnNameB.add("Name");
                                     columnNameB.add("Value");
                                     columnNameB.add("Count");
-                                    dataPanel.add(new DatatablePanel(api, db, configLoader, generator, columnNameB, selectedObject, null, tableName, DisplayMode.COUNT), BorderLayout.CENTER);
+                                    dataPanel.add(new Datatable(api, db, configLoader, generator, columnNameB, selectedObject, null, tableName, Mode.COUNT), BorderLayout.CENTER);
                                 } else {
                                     List<String> columnNameA = new ArrayList<>();
                                     columnNameA.add("Name");
                                     columnNameA.add("Count");
-                                    dataPanel.add(new DatatablePanel(api, db, configLoader, generator, columnNameA, selectedObject, null, tableName, DisplayMode.COUNT), BorderLayout.CENTER);
+                                    dataPanel.add(new Datatable(api, db, configLoader, generator, columnNameA, selectedObject, null, tableName, Mode.COUNT), BorderLayout.CENTER);
                                 }
 
                                 if (!selectedHost.equals(previousHostText)) {
                                     hostTextField.setText(selectedHost);
                                 }
                                 hostComboBox.setPopupVisible(false);
-                            } catch (Exception ignored) {
+                            } catch (Exception ex) {
+                                api.logging().logToError("Failed to process data panel: " + ex.getMessage());
                             }
                         }
                     }
@@ -230,7 +251,7 @@ public class Databoard extends JPanel {
         }
     }
 
-    private List<String> getHostByList(String tableName) {
+    private List<String> getHostByList(String tableName, String hostName) {
         // 先从缓存中查找
         if (hostCache.containsKey(tableName)) {
             return hostCache.get(tableName);
@@ -238,32 +259,34 @@ public class Databoard extends JPanel {
 
         // 缓存中没有，则查询数据库
         List<String> hosts = db.getAllHosts(tableName);
-        hosts = new ArrayList<>(new HashSet<>(hosts)); // 去重
+        if (hosts == null || hosts.isEmpty()) {
+            return new ArrayList<>();
+        }
 
-        // 用于暂存新生成的 anyHost
-        List<String> newAnyHosts = new ArrayList<>();
+        // 使用Set进行去重，提高性能
+        Set<String> hostSet = new LinkedHashSet<>(hosts);
 
         // 添加通配符Host
-        for (String host : hosts) {
+        List<String> wildcardHosts = new ArrayList<>();
+        for (String host : hostSet) {
             if (!HttpUtils.matchHostIsIp(host)) {
                 String[] splitHost = host.split("\\.");
                 if (splitHost.length > 2) {
                     String anyHost = HttpUtils.replaceFirstOccurrence(host, splitHost[0], "*");
-                    if (!anyHost.isEmpty()) {
-                        newAnyHosts.add(anyHost);
+                    if (!anyHost.isEmpty() && !anyHost.equals(host)) {
+                        wildcardHosts.add(anyHost);
                     }
                 }
             }
         }
 
-        // 统一添加所有新生成的 anyHost
-        hosts.addAll(newAnyHosts);
+        // 添加通配符主机
+        hostSet.addAll(wildcardHosts);
 
-        // 再次去重
-        hosts = new ArrayList<>(new HashSet<>(hosts));
-
-        hostCache.put(tableName, hosts);
-        return hosts;
+        // 转换为List并缓存
+        List<String> result = new ArrayList<>(hostSet);
+        hostCache.put(tableName, result);
+        return result;
     }
 
     private void handleKeyEvents(KeyEvent e) {

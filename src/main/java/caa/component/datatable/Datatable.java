@@ -1,4 +1,4 @@
-package caa.component.member;
+package caa.component.datatable;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.requests.HttpRequest;
@@ -6,7 +6,7 @@ import caa.component.generator.Generator;
 import caa.instances.Database;
 import caa.instances.payload.PayloadGenerator;
 import caa.utils.ConfigLoader;
-import caa.utils.UITools;
+import caa.utils.UIEnhancer;
 import com.google.common.collect.SetMultimap;
 
 import javax.swing.*;
@@ -20,40 +20,41 @@ import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.Comparator;
-import java.util.HashSet;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 
-public class DatatablePanel extends JPanel {
+public class Datatable extends JPanel {
     private final JTable dataTable;
     private final DefaultTableModel dataTableModel;
     private final JTextField searchField;
+    private final JTextField secondSearchField;
     private final TableRowSorter<DefaultTableModel> sorter;
     private final MontoyaApi api;
     private final ConfigLoader configLoader;
     private final Generator generator;
     private final JCheckBox searchMode = new JCheckBox("Reverse search");
+    private final JCheckBox regexMode = new JCheckBox("Regex mode");
     private final String tabName;
     private final Object dataObj;
     private final int columnSize;
     private final HttpRequest httpRequest;
     private final Database db;
     private final PayloadGenerator payloadGenerator;
-    private final DisplayMode displayMode;
+    private final Mode mode;
+    private String currentHost = "";
 
-    public DatatablePanel(MontoyaApi api, Database db, ConfigLoader configLoader, Generator generator, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName, DisplayMode displayMode) {
+    public Datatable(MontoyaApi api, Database db, ConfigLoader configLoader, Generator generator, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName, Mode mode) {
         this.api = api;
         this.db = db;
         this.configLoader = configLoader;
         this.generator = generator;
-        this.tabName = tabName.replace("All ", "");
+        this.tabName = tabName;
         this.dataObj = dataObj;
         this.httpRequest = httpRequest;
         this.columnSize = columnNameList.size();
         this.payloadGenerator = new PayloadGenerator(api, configLoader);
-        this.displayMode = displayMode;
+        this.mode = mode;
 
         String[] columnNames = new String[columnSize + 1];
         columnNames[0] = "#";
@@ -65,7 +66,8 @@ public class DatatablePanel extends JPanel {
         dataTable = new JTable(dataTableModel);
         sorter = new TableRowSorter<>(dataTableModel);
 
-        searchField = new JTextField();
+        searchField = new JTextField(10);
+        secondSearchField = new JTextField(10);
 
         initComponents();
     }
@@ -83,10 +85,10 @@ public class DatatablePanel extends JPanel {
         idColumn.setPreferredWidth(50);
         idColumn.setMaxWidth(100);
 
-        if (displayMode == DisplayMode.COUNT) {
+        if (mode == Mode.COUNT) {
             TableColumn countColumn = dataTable.getColumnModel().getColumn(columnSize);
-            countColumn.setPreferredWidth(50);
-            countColumn.setMaxWidth(150);
+            countColumn.setPreferredWidth(100);
+            countColumn.setMaxWidth(300);
 
             sorter.setComparator(columnSize, new Comparator<Integer>() {
                 @Override
@@ -99,12 +101,29 @@ public class DatatablePanel extends JPanel {
         dataTable.setRowSorter(sorter);
         populateTableData();
 
-        // 设置灰色默认文本
-        String searchText = "Search";
-        UITools.setTextFieldPlaceholder(searchField, searchText);
+        UIEnhancer.setTextFieldPlaceholder(searchField, "Search");
 
-        // 监听输入框内容输入、更新、删除
         searchField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                performSearch();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                performSearch();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                performSearch();
+            }
+
+        });
+
+        UIEnhancer.setTextFieldPlaceholder(secondSearchField, "Second search");
+
+        secondSearchField.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
                 performSearch();
@@ -135,11 +154,14 @@ public class DatatablePanel extends JPanel {
         optionsPanel.setLayout(new BoxLayout(optionsPanel, BoxLayout.X_AXIS));
 
         // 新增复选框要在这修改rows
-        JPanel menuPanel = new JPanel(new GridLayout(1, 1));
-        menuPanel.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
+        JPanel settingMenuPanel = new JPanel(new GridLayout(2, 1));
+        settingMenuPanel.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
         JPopupMenu menu = new JPopupMenu();
-        menuPanel.add(searchMode);
-        menu.add(menuPanel);
+        settingMenuPanel.add(searchMode);
+        settingMenuPanel.add(regexMode);
+        regexMode.setSelected(true);
+        searchMode.addItemListener(e -> performSearch());
+        menu.add(settingMenuPanel);
 
         JButton settingsButton = new JButton("Settings");
         settingsButton.addActionListener(e -> {
@@ -153,6 +175,8 @@ public class DatatablePanel extends JPanel {
         optionsPanel.add(settingsButton);
         optionsPanel.add(Box.createHorizontalStrut(5));
         optionsPanel.add(searchField);
+        optionsPanel.add(Box.createHorizontalStrut(5));
+        optionsPanel.add(secondSearchField);
 
         // 右键快捷方式
         JPopupMenu popupMenu = new JPopupMenu();
@@ -201,15 +225,49 @@ public class DatatablePanel extends JPanel {
             generator.insertNewTab(httpRequest, tabName, payloads);
         });
 
+        // 添加删除菜单项（仅在COUNT模式下，即Databoard中显示）
+        JMenuItem deleteItem = new JMenuItem("Delete Selected");
+        deleteItem.addActionListener(e -> {
+            int[] selectedRows = dataTable.getSelectedRows();
+            if (selectedRows.length == 0) {
+                JOptionPane.showMessageDialog(this, "Please select data to delete", "Warning", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            int confirm = JOptionPane.showConfirmDialog(
+                    this,
+                    "Are you sure you want to delete " + selectedRows.length + " selected item(s)?",
+                    "Confirm Delete",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE
+            );
+
+            if (confirm == JOptionPane.YES_OPTION) {
+                deleteSelectedRows(selectedRows);
+            }
+        });
+
         dataTable.addMouseListener(new MouseAdapter() {
             public void mouseReleased(MouseEvent e) {
                 if (SwingUtilities.isRightMouseButton(e)) {
+                    popupMenu.removeAll();
+
                     if (tabName.equals("Param") || tabName.equals("Value")) {
                         popupMenu.add(copyMenu);
                     }
+
                     if (httpRequest != null) {
                         popupMenu.add(sendToGenerator);
                     }
+
+                    // 只在COUNT模式下（Databoard）添加删除菜单
+                    if (mode == Mode.COUNT) {
+                        if (popupMenu.getComponentCount() > 0) {
+                            popupMenu.addSeparator();
+                        }
+                        popupMenu.add(deleteItem);
+                    }
+
                     popupMenu.show(e.getComponent(), e.getX(), e.getY());
                 }
             }
@@ -247,34 +305,51 @@ public class DatatablePanel extends JPanel {
     }
 
     private void performSearch() {
-        if (searchField.getForeground().equals(Color.BLACK)) {
-            RowFilter<Object, Object> rowFilter = new RowFilter<Object, Object>() {
-                public boolean include(Entry<?, ?> entry) {
-                    String searchFieldTextText = searchField.getText();
+        List<RowFilter<Object, Object>> filters = new ArrayList<>();
+
+        if (UIEnhancer.hasUserInput(searchField)) {
+            filters.add(getObjectObjectRowFilter(searchField, true));
+        }
+
+        if (UIEnhancer.hasUserInput(secondSearchField)) {
+            filters.add(getObjectObjectRowFilter(secondSearchField, false));
+        }
+
+        sorter.setRowFilter(filters.isEmpty() ? null : RowFilter.andFilter(filters));
+    }
+
+    private RowFilter<Object, Object> getObjectObjectRowFilter(JTextField searchField, boolean firstFlag) {
+        return new RowFilter<>() {
+            public boolean include(Entry<?, ?> entry) {
+                String searchFieldTextText = searchField.getText();
+                searchFieldTextText = searchFieldTextText.toLowerCase();
+                String entryValue = ((String) entry.getValue(1)).toLowerCase();
+                boolean filterReturn = searchFieldTextText.isEmpty();
+                boolean firstFlagReturn = searchMode.isSelected() && firstFlag;
+                if (regexMode.isSelected()) {
                     Pattern pattern = null;
                     try {
                         pattern = Pattern.compile(searchFieldTextText, Pattern.CASE_INSENSITIVE);
                     } catch (Exception ignored) {
                     }
 
-                    String entryValue = ((String) entry.getValue(1)).toLowerCase();
-                    searchFieldTextText = searchFieldTextText.toLowerCase();
                     if (pattern != null) {
-                        return searchFieldTextText.isEmpty() || pattern.matcher(entryValue).find() != searchMode.isSelected();
-                    } else {
-                        return searchFieldTextText.isEmpty() || entryValue.contains(searchFieldTextText) != searchMode.isSelected();
+                        filterReturn = filterReturn || pattern.matcher(entryValue).find() != firstFlagReturn;
                     }
+                } else {
+                    filterReturn = filterReturn || entryValue.contains(searchFieldTextText) != firstFlagReturn;
                 }
-            };
-            sorter.setRowFilter(rowFilter);
-        }
+
+                return filterReturn;
+            }
+        };
     }
 
     /**
      * 填充表格数据
      */
     private void populateTableData() {
-        if (displayMode == DisplayMode.COUNT) {
+        if (mode == Mode.COUNT) {
             if (columnSize > 2) {
                 ((SetMultimap<String, String>) dataObj).forEach((k, v) -> {
                     // 解析组合的值
@@ -303,13 +378,99 @@ public class DatatablePanel extends JPanel {
         }
     }
 
+    private void deleteSelectedRows(int[] selectedRows) {
+        SwingWorker<Integer, Void> worker = new SwingWorker<Integer, Void>() {
+            @Override
+            protected Integer doInBackground() {
+                List<Map<String, String>> dataToDelete = new ArrayList<>();
+
+                // 收集要删除的数据
+                for (int row : selectedRows) {
+                    int modelRow = dataTable.convertRowIndexToModel(row);
+                    Map<String, String> data = new HashMap<>();
+
+                    // 获取name值（第1列）
+                    Object nameObj = dataTableModel.getValueAt(modelRow, 1);
+                    if (nameObj != null) {
+                        data.put("name", nameObj.toString());
+                    }
+
+                    // 如果是Value表，获取value值（第2列）
+                    if (tabName.equals("Value") && columnSize > 2) {
+                        Object valueObj = dataTableModel.getValueAt(modelRow, 2);
+                        if (valueObj != null) {
+                            data.put("value", valueObj.toString());
+                        }
+                    }
+
+                    dataToDelete.add(data);
+                }
+                // 批量删除
+                return db.batchDeleteData(currentHost, tabName, dataToDelete);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    int deletedCount = get();
+
+                    if (deletedCount > 0) {
+                        // 从表格中移除已删除的行
+                        Arrays.sort(selectedRows);
+                        for (int i = selectedRows.length - 1; i >= 0; i--) {
+                            int modelRow = dataTable.convertRowIndexToModel(selectedRows[i]);
+                            dataTableModel.removeRow(modelRow);
+                        }
+
+                        // 更新行号
+                        updateRowNumbers();
+
+                        JOptionPane.showMessageDialog(
+                                Datatable.this,
+                                "Successfully deleted " + deletedCount + " item(s)",
+                                "Success",
+                                JOptionPane.INFORMATION_MESSAGE
+                        );
+                    } else {
+                        JOptionPane.showMessageDialog(
+                                Datatable.this,
+                                "Failed to delete data",
+                                "Error",
+                                JOptionPane.ERROR_MESSAGE
+                        );
+                    }
+                } catch (Exception ex) {
+                    api.logging().logToError("Failed to delete data: " + ex.getMessage());
+                    JOptionPane.showMessageDialog(
+                            Datatable.this,
+                            "Error: " + ex.getMessage(),
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                }
+            }
+        };
+
+        worker.execute();
+    }
+
+    private void updateRowNumbers() {
+        for (int i = 0; i < dataTableModel.getRowCount(); i++) {
+            dataTableModel.setValueAt(i + 1, i, 0);
+        }
+    }
+
+    public void setCurrentHost(String host) {
+        this.currentHost = host;
+    }
+
     public String getSelectedDataAtTable(JTable table) {
         int[] selectRows = table.getSelectedRows();
         StringBuilder selectData = new StringBuilder();
 
         for (int row : selectRows) {
             int columnCount = table.getColumnCount();
-            if (displayMode == DisplayMode.COUNT) {
+            if (mode == Mode.COUNT) {
                 switch (columnCount) {
                     case 3 -> selectData.append(table.getValueAt(row, 1).toString()).append("\r\n");
                     case 4 ->

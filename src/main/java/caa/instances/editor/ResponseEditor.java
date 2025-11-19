@@ -10,9 +10,9 @@ import burp.api.montoya.ui.Selection;
 import burp.api.montoya.ui.editor.extension.EditorCreationContext;
 import burp.api.montoya.ui.editor.extension.ExtensionProvidedHttpResponseEditor;
 import burp.api.montoya.ui.editor.extension.HttpResponseEditorProvider;
+import caa.component.datatable.Datatable;
+import caa.component.datatable.Mode;
 import caa.component.generator.Generator;
-import caa.component.member.DatatablePanel;
-import caa.component.member.DisplayMode;
 import caa.instances.Collector;
 import caa.instances.Database;
 import caa.utils.ConfigLoader;
@@ -52,7 +52,7 @@ public class ResponseEditor implements HttpResponseEditorProvider {
         private final HttpUtils httpUtils;
         private final JTabbedPane jTabbedPane;
         private final EditorCreationContext creationContext;
-        private DatatablePanel dataPanel;
+        private Datatable dataPanel;
         private JTable dataTable;
         private HttpRequestResponse requestResponse;
         private LinkedHashMap<String, Object> dataMap;
@@ -96,15 +96,14 @@ public class ResponseEditor implements HttpResponseEditorProvider {
                             String toolType = creationContext.toolSource().toolType().toolName();
                             matches = httpUtils.verifyHttpRequestResponse(requestResponse, toolType);
                         }
-                    } catch (Exception ignored) {
+                    } catch (Exception e) {
+                        api.logging().logToError("Failed to verify request in ResponseEditor: " + e.getMessage());
                     }
                 }
 
                 if (!matches) {
                     Collector collector = new Collector(api, db, configLoader);
-                    collector.passiveAudit(requestResponse);
-
-                    dataMap = new LinkedHashMap<>(collector.getDataMap());
+                    dataMap = new LinkedHashMap<>(collector.collect(requestResponse));
 
                     return !dataMap.isEmpty();
                 }
@@ -151,17 +150,17 @@ public class ResponseEditor implements HttpResponseEditorProvider {
             return false;
         }
 
-        private DatatablePanel generateTabWithData(HttpRequest httpRequest) {
+        private Datatable generateTabWithData(HttpRequest httpRequest) {
             jTabbedPane.removeAll();
 
-            DatatablePanel component = null;
+            Datatable component = null;
             List<String> columnNameA = new ArrayList<>();
             columnNameA.add("Name");
             for (String i : dataMap.keySet()) {
                 if (i.equals("Value")) {
                     columnNameA.add("Value");
                 }
-                component = new DatatablePanel(api, db, configLoader, generator, columnNameA, dataMap.get(i), httpRequest, i, DisplayMode.STANDARD);
+                component = new Datatable(api, db, configLoader, generator, columnNameA, dataMap.get(i), httpRequest, i, Mode.STANDARD);
                 jTabbedPane.addTab(i, component);
             }
 
@@ -174,8 +173,8 @@ public class ResponseEditor implements HttpResponseEditorProvider {
                 selectedComponent = ((JTabbedPane) selectedComponent).getSelectedComponent();
             }
 
-            if (selectedComponent instanceof DatatablePanel) {
-                selectedComponent = ((DatatablePanel) selectedComponent).getDataTable();
+            if (selectedComponent instanceof Datatable) {
+                selectedComponent = ((Datatable) selectedComponent).getDataTable();
             }
 
             return selectedComponent;

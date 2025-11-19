@@ -39,14 +39,6 @@ public class Collector implements ScanCheck {
     private final Database db;
     private final ConfigLoader configLoader;
     private final HttpUtils httpUtils;
-    private Map<String, Object> dataMap;
-
-    // 初始化存储容器
-    private Set<String> pathList;
-    private Set<String> fullPathList;
-    private Set<String> fileList;
-    private Set<String> paramList;
-    private SetMultimap<String, String> valueList;
 
     public Collector(MontoyaApi api, Database db, ConfigLoader configLoader) {
         this.api = api;
@@ -99,12 +91,13 @@ public class Collector implements ScanCheck {
 
     @Override
     public AuditResult passiveAudit(HttpRequestResponse baseRequestResponse) {
-        dataMap = new HashMap<>();
-        pathList = new HashSet<>();
-        fullPathList = new HashSet<>();
-        fileList = new HashSet<>();
-        paramList = new HashSet<>();
-        valueList = LinkedHashMultimap.create();
+        // 使用局部变量确保线程安全
+        Map<String, Object> dataMap = new HashMap<>();
+        Set<String> pathList = new HashSet<>();
+        Set<String> fullPathList = new HashSet<>();
+        Set<String> fileList = new HashSet<>();
+        Set<String> paramList = new HashSet<>();
+        SetMultimap<String, String> valueList = LinkedHashMultimap.create();
 
         // 基于被动扫描分析、收集数据
         HttpRequest request = baseRequestResponse.request();
@@ -116,7 +109,8 @@ public class Collector implements ScanCheck {
                 URL u = new URL(request.url());
                 path = u.getPath().replaceAll("/+", "/");
                 host = u.getHost();
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                api.logging().logToError("Failed to parse URL: " + e.getMessage());
             }
 
             boolean matches = httpUtils.verifyHttpRequestResponse(baseRequestResponse, "Proxy");
@@ -154,7 +148,7 @@ public class Collector implements ScanCheck {
                             Map<String, Object> jsonData = getJsonData(paramValue);
 
                             if (jsonData != null) {
-                                processJsonData(jsonData);
+                                processJsonData(jsonData, valueList, paramList);
                             } else {
                                 valueList.put(paramName, paramValue);
                             }
@@ -176,7 +170,9 @@ public class Collector implements ScanCheck {
                             Map<String, Object> jsonData = getJsonData(responseBody);
 
                             if (jsonData != null) {
-                                processJsonData(jsonData);
+                                processJsonData(jsonData, valueList, paramList);
+                                // 将JSON解析结果缓存，避免重复解析
+                                CachePool.addToCache(hashIndex, jsonData);
                             } else {
                                 // 尝试对HTML程序进行解析
                                 Document doc = Jsoup.parse(responseBody);
@@ -201,7 +197,8 @@ public class Collector implements ScanCheck {
                                     }
                                 }
                             }
-                        } catch (Exception ignored) {
+                        } catch (Exception e) {
+                            api.logging().logToError("Failed to parse response body: " + e.getMessage());
                         }
 
                         // 存储结果到内存中
@@ -232,6 +229,9 @@ public class Collector implements ScanCheck {
                             CompletableFuture.supplyAsync(() -> {
                                 db.insertData(finalHost, collectMap);
                                 return null;
+                            }).exceptionally(ex -> {
+                                api.logging().logToError("Failed to insert data asynchronously: " + ex.getMessage());
+                                return null;
                             });
                         }
 
@@ -242,7 +242,6 @@ public class Collector implements ScanCheck {
                 }
             }
 
-            putCurrentDataToMap();
         }
 
         if (request == null && response != null) {
@@ -253,28 +252,13 @@ public class Collector implements ScanCheck {
             if (cachePool != null) {
                 valueList.putAll((SetMultimap) cachePool.get("jsonKeyValue"));
                 paramList.addAll((HashSet) cachePool.get("jsonKey"));
-                putCurrentDataToMap();
             }
         }
 
         return auditResult(emptyList());
     }
 
-    private void putCurrentDataToMap() {
-        if (!paramList.isEmpty()) {
-            dataMap.put("Param", paramList);
-        }
-
-        if (!valueList.isEmpty()) {
-            dataMap.put("Value", valueList);
-        }
-
-        if (!pathList.isEmpty()) {
-            dataMap.put("Path", pathList);
-        }
-    }
-
-    private void processJsonData(Map<String, Object> jsonData) {
+    private void processJsonData(Map<String, Object> jsonData, SetMultimap<String, String> valueList, Set<String> paramList) {
         Object jsonKeyValue = jsonData.get("jsonKeyValue");
         Object jsonKey = jsonData.get("jsonKey");
         if (jsonKeyValue != null) {
@@ -286,8 +270,122 @@ public class Collector implements ScanCheck {
         }
     }
 
-    public Map<String, Object> getDataMap() {
-        return dataMap;
+    /**
+     * 收集HTTP请求响应中的数据，不存储到数据库，直接返回结果
+     * 用于ResponseEditor等组件
+     */
+    public Map<String, Object> collect(HttpRequestResponse baseRequestResponse) {
+        Map<String, Object> resultMap = new HashMap<>();
+        Set<String> pathList = new HashSet<>();
+        Set<String> paramList = new HashSet<>();
+        SetMultimap<String, String> valueList = LinkedHashMultimap.create();
+
+        HttpRequest request = baseRequestResponse.request();
+        HttpResponse response = baseRequestResponse.response();
+
+        if (request != null) {
+            String path = "";
+            try {
+                URL u = new URL(request.url());
+                path = u.getPath().replaceAll("/+", "/");
+            } catch (Exception e) {
+                api.logging().logToError("Failed to parse URL in collect: " + e.getMessage());
+            }
+
+            boolean matches = httpUtils.verifyHttpRequestResponse(baseRequestResponse, "Proxy");
+            if (!matches) {
+                // 收集请求路径
+                if (!"/".equals(path)) {
+                    Arrays.stream(path.split("/")).filter(p -> !p.isBlank()).forEach(p -> {
+                        if (!p.contains(".") || p.equals(".") || p.indexOf(".") == p.length() - 1) {
+                            pathList.add(p.replaceAll(":", ""));
+                        }
+                    });
+                }
+
+                // 收集请求参数
+                List<ParsedHttpParameter> paramsList = request.parameters();
+                for (ParsedHttpParameter param : paramsList) {
+                    String paramName = httpUtils.decodeParameter(param.name()).trim().replaceAll("\\?", "");
+                    if ("_".equals(paramName)) {
+                        paramName = "";
+                    }
+                    if (!paramName.isBlank() && paramName.matches("[\\w\\-\\.]+")) {
+                        paramList.add(paramName);
+                        String paramValue = httpUtils.decodeParameter(param.value());
+                        if (!paramValue.isBlank()) {
+                            Map<String, Object> jsonData = getJsonData(paramValue);
+                            if (jsonData != null) {
+                                processJsonData(jsonData, valueList, paramList);
+                            } else {
+                                valueList.put(paramName, paramValue);
+                            }
+                        }
+                    }
+                }
+
+                // 处理响应数据
+                if (response != null) {
+                    ByteArray responseBodyBytes = response.body();
+                    String hashIndex = HashCalculator.calculateHash(responseBodyBytes.getBytes());
+                    Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
+
+                    if (cachePool == null) {
+                        // 如果缓存中没有，尝试解析JSON
+                        try {
+                            String responseBody = new String(responseBodyBytes.getBytes(), StandardCharsets.UTF_8);
+                            Map<String, Object> jsonData = getJsonData(responseBody);
+                            if (jsonData != null) {
+                                processJsonData(jsonData, valueList, paramList);
+                                CachePool.addToCache(hashIndex, jsonData);
+                            }
+                        } catch (Exception e) {
+                            api.logging().logToError("Failed to parse response in collect: " + e.getMessage());
+                        }
+                    } else {
+                        Object cachedValueList = cachePool.get("jsonKeyValue");
+                        Object cachedParamList = cachePool.get("jsonKey");
+                        if (cachedValueList != null) {
+                            valueList.putAll((SetMultimap) cachedValueList);
+                        }
+                        if (cachedParamList != null) {
+                            paramList.addAll((HashSet) cachedParamList);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 处理只有响应没有请求的情况
+        if (request == null && response != null) {
+            ByteArray responseBodyBytes = response.body();
+            String hashIndex = HashCalculator.calculateHash(responseBodyBytes.getBytes());
+            Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
+
+            if (cachePool != null) {
+                Object cachedValueList = cachePool.get("jsonKeyValue");
+                Object cachedParamList = cachePool.get("jsonKey");
+                if (cachedValueList != null) {
+                    valueList.putAll((SetMultimap) cachedValueList);
+                }
+                if (cachedParamList != null) {
+                    paramList.addAll((HashSet) cachedParamList);
+                }
+            }
+        }
+
+        // 返回结果
+        if (!paramList.isEmpty()) {
+            resultMap.put("Param", paramList);
+        }
+        if (!valueList.isEmpty()) {
+            resultMap.put("Value", valueList);
+        }
+        if (!pathList.isEmpty()) {
+            resultMap.put("Path", pathList);
+        }
+
+        return resultMap;
     }
 
     @Override

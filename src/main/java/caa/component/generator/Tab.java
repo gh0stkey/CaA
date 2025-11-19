@@ -9,7 +9,7 @@ import caa.Config;
 import caa.instances.payload.PayloadGenerator;
 import caa.utils.ConfigLoader;
 import caa.utils.HttpUtils;
-import caa.utils.UITools;
+import caa.utils.UIEnhancer;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -20,7 +20,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.stream.IntStream;
 
-public class GeneratorTab extends JPanel {
+public class Tab extends JPanel {
     private final MontoyaApi api;
     private final ConfigLoader configLoader;
     private final HttpUtils httpUtils;
@@ -46,7 +46,7 @@ public class GeneratorTab extends JPanel {
     private JTextField valueInputField;
     private JTextField valueLengthField;
 
-    public GeneratorTab(MontoyaApi api, ConfigLoader configLoader, HttpRequest httpRequest, String payloadType, String payloads) {
+    public Tab(MontoyaApi api, ConfigLoader configLoader, HttpRequest httpRequest, String payloadType, String payloads) {
         this.api = api;
         this.configLoader = configLoader;
         this.httpUtils = new HttpUtils(api, configLoader);
@@ -241,21 +241,6 @@ public class GeneratorTab extends JPanel {
             }
         });
 
-        payloadTypeComboBox.addActionListener(e -> {
-            String selected = payloadTypeComboBox.getSelectedItem().toString();
-            if (selected.equals("Value")) {
-                payloadTableModel.addColumn("Value");
-                payloadTableModel.setColumnCount(2);
-
-                payloadTable.addMouseListener(mouseAdapter);
-            } else {
-                payloadTableModel.setColumnCount(1);
-                payloadTable.removeMouseListener(mouseAdapter);
-            }
-
-            setValueEnabled(selected.equals("Param"));
-        });
-
         constraints.insets = new Insets(0, 0, 0, 0);
         constraints.gridy = 0;
         buttonPanel.add(addButton, constraints);
@@ -268,7 +253,8 @@ public class GeneratorTab extends JPanel {
 
         JTextField addTextField = new JTextField();
         String defaultText = "Enter a new item";
-        UITools.setTextFieldPlaceholder(addTextField, defaultText);
+        String defaultTextForValue = "Enter a new item (e.g. key=value)";
+        UIEnhancer.setTextFieldPlaceholder(addTextField, defaultText);
 
         addTextField.addKeyListener(new KeyAdapter() {
             @Override
@@ -277,6 +263,25 @@ public class GeneratorTab extends JPanel {
                     addActionPerformed(null, payloadTableModel, addTextField);
                 }
             }
+        });
+
+        payloadTypeComboBox.addActionListener(e -> {
+            String selected = payloadTypeComboBox.getSelectedItem().toString();
+            if (selected.equals("Value")) {
+                payloadTableModel.addColumn("Value");
+                payloadTableModel.setColumnCount(2);
+
+                payloadTable.addMouseListener(mouseAdapter);
+                // 切换到Value模式时，更新输入框提示文本
+                UIEnhancer.setTextFieldPlaceholder(addTextField, defaultTextForValue);
+            } else {
+                payloadTableModel.setColumnCount(1);
+                payloadTable.removeMouseListener(mouseAdapter);
+                // 切换到其他模式时，恢复原始提示文本
+                UIEnhancer.setTextFieldPlaceholder(addTextField, defaultText);
+            }
+
+            setValueEnabled(selected.equals("Param"));
         });
 
         JPanel payloadTypePanel = new JPanel(new BorderLayout(10, 0));
@@ -302,7 +307,7 @@ public class GeneratorTab extends JPanel {
             }
         });
 
-        UITools.addButtonListener(pasteButton, removeButton, clearButton, payloadTable, payloadTableModel, this::addDataToTable);
+        UIEnhancer.addButtonListener(pasteButton, removeButton, clearButton, payloadTable, payloadTableModel, this::addDataToTable);
 
         payloadTablePanel.add(buttonPanel, BorderLayout.EAST);
         payloadTablePanel.add(inputPanel, BorderLayout.CENTER);
@@ -413,6 +418,6 @@ public class GeneratorTab extends JPanel {
             model.addRow(cellData);
         }
 
-        UITools.deduplicateTableData(model);
+        UIEnhancer.deduplicateTableData(model);
     }
 }

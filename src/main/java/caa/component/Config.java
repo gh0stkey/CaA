@@ -2,7 +2,7 @@ package caa.component;
 
 import burp.api.montoya.MontoyaApi;
 import caa.utils.ConfigLoader;
-import caa.utils.UITools;
+import caa.utils.UIEnhancer;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -188,7 +188,7 @@ public class Config extends JPanel {
         buttonPanel.add(clearButton, constraints);
 
         JTextField addTextField = new JTextField();
-        UITools.setTextFieldPlaceholder(addTextField, defaultText);
+        UIEnhancer.setTextFieldPlaceholder(addTextField, defaultText);
 
         inputPanelB.add(addTextField, BorderLayout.CENTER);
         inputPanel.add(scrollPane, BorderLayout.CENTER);
@@ -209,7 +209,7 @@ public class Config extends JPanel {
             }
         });
 
-        UITools.addButtonListener(pasteButton, removeButton, clearButton, table, model, this::addDataToTable);
+        UIEnhancer.addButtonListener(pasteButton, removeButton, clearButton, table, model, this::addDataToTable);
 
         JPanel settingMainPanel = new JPanel(new BorderLayout());
         settingMainPanel.setBorder(new EmptyBorder(5, 15, 10, 15));
@@ -241,7 +241,7 @@ public class Config extends JPanel {
             for (String row : rows) {
                 model.addRow(new String[]{row});
             }
-            UITools.deduplicateTableData(model);
+            UIEnhancer.deduplicateTableData(model);
         }
     }
 

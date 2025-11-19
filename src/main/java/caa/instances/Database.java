@@ -14,10 +14,11 @@ public class Database {
 
     public Database(MontoyaApi api, String dbFileName) {
         this.api = api;
+        Statement statement = null;
         try {
             Class.forName("org.sqlite.JDBC");
             this.connection = DriverManager.getConnection(String.format("jdbc:sqlite:%s", dbFileName));
-            Statement statement = this.connection.createStatement();
+            statement = this.connection.createStatement();
 
             // 开启 WAL 模式
             statement.executeUpdate("PRAGMA journal_mode=WAL;");
@@ -28,11 +29,11 @@ public class Database {
             // 开启自动检查点模式
             statement.executeUpdate("PRAGMA wal_autocheckpoint = 2000;");
 
-            // 关闭同步模式
-            statement.executeUpdate("PRAGMA synchronous=OFF;");
+            // 关闭同步模式（提升写入性能）
+            statement.executeUpdate("PRAGMA synchronous=NORMAL;");
 
-            // 启用缓存
-            statement.executeUpdate("PRAGMA cache_size = 10000;");
+            // 启用缓存（增加缓存大小）
+            statement.executeUpdate("PRAGMA cache_size = 20000;");
 
             // 设置临时表存储在内存中
             statement.executeUpdate("PRAGMA temp_store = MEMORY;");
@@ -43,13 +44,24 @@ public class Database {
             // 禁用外键约束
             statement.executeUpdate("PRAGMA foreign_keys = OFF;");
 
-            // 优化数据库
-            statement.executeUpdate("PRAGMA optimize;");
+            // 设置mmap大小以提升读取性能
+            statement.executeUpdate("PRAGMA mmap_size = 268435456;"); // 256MB
+
+            // 使用内存临时存储
+            statement.executeUpdate("PRAGMA temp_store = MEMORY;");
 
             // 初始化数据表
             createTables();
+
+            // 创建索引以提升查询性能
+            createIndexes();
+
+            // 优化数据库
+            statement.executeUpdate("PRAGMA optimize;");
         } catch (Exception e) {
-            api.logging().logToError(e);
+            api.logging().logToError("Failed to initialize database: " + e.getMessage());
+        } finally {
+            closeQuietly(statement);
         }
     }
 
@@ -85,54 +97,59 @@ public class Database {
     }
 
     public Object selectData(String host, String tableName, String limitSize) {
+        PreparedStatement ps = null;
+        ResultSet rs = null;
         try {
-            if (!connection.isClosed()) {
-                boolean isLikeQuery = host.contains("*.");
+            synchronized (connection) {
+                if (connection.isClosed()) {
+                    return null;
+                }
+            }
 
-                String sql = getSql(tableName, limitSize, isLikeQuery);
+            boolean isLikeQuery = host.contains("*.");
+            String sql = getSql(tableName, limitSize, isLikeQuery);
 
-                PreparedStatement ps = connection.prepareStatement(sql);
+            synchronized (connection) {
+                ps = connection.prepareStatement(sql);
                 if (isLikeQuery) {
                     ps.setString(1, "%" + host.replace("*.", "."));
                 } else if (!host.isEmpty()) {
                     ps.setString(1, host);
                 }
-                ResultSet rs = ps.executeQuery();
+                rs = ps.executeQuery();
 
                 // 判断结果集是否为空
                 if (!rs.isBeforeFirst()) {
                     return null;
-                } else {
-                    if (tableName.equals("Value")) {
-                        SetMultimap<String, String> multimap = LinkedHashMultimap.create();
-                        while (rs.next()) {
-                            String key = rs.getString(1);
-                            String value = rs.getString(2);
-                            int count = rs.getInt(3);
-                            // 将 count 和 value 组合成一个字符串
-                            String combinedValue = String.format("%d|%s", count, value);
-                            multimap.put(key, combinedValue);
-                        }
-                        if (multimap.size() <= 0) {
-                            return null;
-                        }
-                        return multimap;
-                    } else {
-                        Map<String, Integer> resultMap = new LinkedHashMap<>();
-                        while (rs.next()) {
-                            String columnValue = rs.getString(1);
-                            int count = rs.getInt(2);
-                            resultMap.put(columnValue, count);
-                        }
-                        if (resultMap.isEmpty()) {
-                            return null;
-                        }
-                        return resultMap;
+                }
+
+                // 处理结果集（在synchronized块外）
+                if (tableName.equals("Value")) {
+                    SetMultimap<String, String> multimap = LinkedHashMultimap.create();
+                    while (rs.next()) {
+                        String key = rs.getString(1);
+                        String value = rs.getString(2);
+                        int count = rs.getInt(3);
+                        // 将 count 和 value 组合成一个字符串
+                        String combinedValue = String.format("%d|%s", count, value);
+                        multimap.put(key, combinedValue);
                     }
+                    return multimap.isEmpty() ? null : multimap;
+                } else {
+                    Map<String, Integer> resultMap = new LinkedHashMap<>();
+                    while (rs.next()) {
+                        String columnValue = rs.getString(1);
+                        int count = rs.getInt(2);
+                        resultMap.put(columnValue, count);
+                    }
+                    return resultMap.isEmpty() ? null : resultMap;
                 }
             }
         } catch (Exception e) {
-            api.logging().logToError(e);
+            api.logging().logToError("Failed to select data: " + e.getMessage());
+        } finally {
+            closeQuietly(rs);
+            closeQuietly(ps);
         }
 
         return null;
@@ -160,74 +177,161 @@ public class Database {
             } else {
                 uniqueField = ", UNIQUE(name)";
             }
+            Statement stmt = null;
             try {
-                Statement stmt = connection.createStatement();
+                stmt = connection.createStatement();
                 stmt.execute(String.format(sqlTemplate, name, fields, uniqueField));
             } catch (Exception e) {
-                api.logging().logToError(e);
+                api.logging().logToError("Failed to create table " + name + ": " + e.getMessage());
+            } finally {
+                closeQuietly(stmt);
             }
         }
     }
 
-    public List<String> getAllHosts(String tableName) {
-        Set<String> setHostList = new HashSet<>();
-        if (Arrays.stream(Config.CaATableName).anyMatch(t -> t.equalsIgnoreCase(tableName))) {
-            try {
-                Statement stmt = connection.createStatement();
-                ResultSet rs = stmt.executeQuery(String.format("SELECT host FROM `%s` WHERE host IS NOT NULL", tableName));
+    private void createIndexes() {
+        Statement stmt = null;
+        try {
+            stmt = connection.createStatement();
 
-                while (rs.next()) {
-                    String host = rs.getString("host");
+            // 为每个表创建索引以提升查询性能
+            for (String tableName : Config.CaATableName) {
+                if (!tableName.contains("All")) {
+                    // 为host字段创建索引
+                    String hostIndexSql = String.format(
+                            "CREATE INDEX IF NOT EXISTS idx_%s_host ON `%s`(host);",
+                            tableName.toLowerCase().replace(" ", "_"), tableName
+                    );
+                    stmt.executeUpdate(hostIndexSql);
+
+                    // 为name字段创建索引
+                    String nameIndexSql = String.format(
+                            "CREATE INDEX IF NOT EXISTS idx_%s_name ON `%s`(name);",
+                            tableName.toLowerCase().replace(" ", "_"), tableName
+                    );
+                    stmt.executeUpdate(nameIndexSql);
+
+                    // 为count字段创建降序索引（用于排序）
+                    String countIndexSql = String.format(
+                            "CREATE INDEX IF NOT EXISTS idx_%s_count ON `%s`(count DESC);",
+                            tableName.toLowerCase().replace(" ", "_"), tableName
+                    );
+                    stmt.executeUpdate(countIndexSql);
+                } else {
+                    // All表只需要name和count索引
+                    String nameIndexSql = String.format(
+                            "CREATE INDEX IF NOT EXISTS idx_%s_name ON `%s`(name);",
+                            tableName.toLowerCase().replace(" ", "_"), tableName
+                    );
+                    stmt.executeUpdate(nameIndexSql);
+
+                    String countIndexSql = String.format(
+                            "CREATE INDEX IF NOT EXISTS idx_%s_count ON `%s`(count DESC);",
+                            tableName.toLowerCase().replace(" ", "_"), tableName
+                    );
+                    stmt.executeUpdate(countIndexSql);
+                }
+            }
+
+            api.logging().logToOutput("[Info] Database indexes created successfully.");
+        } catch (Exception e) {
+            api.logging().logToError("Failed to create indexes: " + e.getMessage());
+        } finally {
+            closeQuietly(stmt);
+        }
+    }
+
+    public List<String> getAllHosts(String tableName) {
+        if (!Arrays.stream(Config.CaATableName).anyMatch(t -> t.equalsIgnoreCase(tableName))) {
+            return new ArrayList<>();
+        }
+
+        Set<String> setHostList = new LinkedHashSet<>();
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            synchronized (connection) {
+                if (connection.isClosed()) {
+                    return new ArrayList<>();
+                }
+                stmt = connection.createStatement();
+                // 使用DISTINCT去重，减少内存处理
+                rs = stmt.executeQuery(String.format("SELECT DISTINCT host FROM `%s` WHERE host IS NOT NULL ORDER BY host", tableName));
+            }
+
+
+            while (rs.next()) {
+                String host = rs.getString("host");
+                if (host != null && !host.isEmpty()) {
                     setHostList.add(host);
                 }
-            } catch (SQLException e) {
-                api.logging().logToError(e);
             }
+        } catch (SQLException e) {
+            api.logging().logToError("Failed to get all hosts: " + e.getMessage());
+        } finally {
+            closeQuietly(rs);
+            closeQuietly(stmt);
         }
         return new ArrayList<>(setHostList);
     }
 
     public void insertData(String host, Map<String, Object> dataObj) {
-        try {
-            connection.setAutoCommit(false);
-            dataObj.forEach((k, v) -> {
-                try {
-                    PreparedStatement insertPs = generateInsertSql(k);
-                    PreparedStatement updatePs = generateUpdateSql(k);
+        synchronized (connection) {
+            try {
+                connection.setAutoCommit(false);
 
-                    if (v instanceof HashSet<?>) {
-                        for (String data : (HashSet<String>) v) {
-                            addBatchToPs(host, k, insertPs, data);
-                            addBatchToPs(host, k, updatePs, data);
+                for (Map.Entry<String, Object> entry : dataObj.entrySet()) {
+                    String k = entry.getKey();
+                    Object v = entry.getValue();
+                    PreparedStatement insertPs = null;
+                    PreparedStatement updatePs = null;
+                    try {
+                        insertPs = generateInsertSql(k);
+                        updatePs = generateUpdateSql(k);
+
+
+                        if (v instanceof HashSet<?>) {
+                            for (String data : (HashSet<String>) v) {
+                                addBatchToPs(host, k, insertPs, data);
+                                addBatchToPs(host, k, updatePs, data);
+                            }
+                        } else if (v instanceof SetMultimap) {
+                            SetMultimap<String, String> multimap = (SetMultimap<String, String>) v;
+                            for (Map.Entry<String, String> mvEntry : multimap.entries()) {
+                                LinkedList<String> dataMap = new LinkedList<>();
+                                dataMap.add(mvEntry.getKey());
+                                dataMap.add(mvEntry.getValue());
+                                addBatchToPs(host, k, insertPs, dataMap);
+                                addBatchToPs(host, k, updatePs, dataMap);
+                            }
                         }
-                    } else if (v instanceof SetMultimap) {
-                        ((SetMultimap<String, String>) v).forEach((vk, vv) -> {
-                            LinkedList<String> dataMap = new LinkedList<>();
-                            dataMap.add(vk);
-                            dataMap.add(vv);
-                            addBatchToPs(host, k, insertPs, dataMap);
-                            addBatchToPs(host, k, updatePs, dataMap);
-                        });
-                    }
 
-                    insertPs.executeBatch();
-                    updatePs.executeBatch();
-                } catch (Exception ignored) {
+                        insertPs.executeBatch();
+                        updatePs.executeBatch();
+                    } catch (Exception e) {
+                        api.logging().logToError("Failed to insert data for table " + k + ": " + e.getMessage());
+                    } finally {
+                        closeQuietly(insertPs);
+                        closeQuietly(updatePs);
+                    }
                 }
-            });
-            connection.commit();
-        } catch (Exception e) {
-            if (connection != null) {
-                try {
-                    connection.rollback();
-                } catch (SQLException ignored) {
+                connection.commit();
+            } catch (Exception e) {
+                api.logging().logToError("Failed to insert data: " + e.getMessage());
+                if (connection != null) {
+                    try {
+                        connection.rollback();
+                    } catch (SQLException ex) {
+                        api.logging().logToError("Failed to rollback: " + ex.getMessage());
+                    }
                 }
-            }
-        } finally {
-            if (connection != null) {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException ignored) {
+            } finally {
+                if (connection != null) {
+                    try {
+                        connection.setAutoCommit(true);
+                    } catch (SQLException ex) {
+                        api.logging().logToError("Failed to set auto commit: " + ex.getMessage());
+                    }
                 }
             }
         }
@@ -291,9 +395,133 @@ public class Database {
                 }
             }
             ps.addBatch();
-        } catch (Exception ignored) {
-
+        } catch (Exception e) {
+            api.logging().logToError("Failed to prepare statement: " + e.getMessage());
         }
+    }
+
+    private void closeQuietly(PreparedStatement ps) {
+        if (ps != null) {
+            try {
+                ps.close();
+            } catch (SQLException e) {
+                api.logging().logToError("Failed to close PreparedStatement: " + e.getMessage());
+            }
+        }
+    }
+
+    private void closeQuietly(Statement stmt) {
+        if (stmt != null) {
+            try {
+                stmt.close();
+            } catch (SQLException e) {
+                api.logging().logToError("Failed to close Statement: " + e.getMessage());
+            }
+        }
+    }
+
+    private void closeQuietly(ResultSet rs) {
+        if (rs != null) {
+            try {
+                rs.close();
+            } catch (SQLException e) {
+                api.logging().logToError("Failed to close ResultSet: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 删除数据
+     *
+     * @param host      主机名（对于All表传空字符串）
+     * @param tableName 表名
+     * @param name      要删除的name值
+     * @param value     要删除的value值（仅对Value表有效）
+     * @return 是否删除成功
+     */
+    public boolean deleteData(String host, String tableName, String name, String value) {
+        PreparedStatement ps = null;
+        try {
+            synchronized (connection) {
+                if (connection.isClosed()) {
+                    return false;
+                }
+
+                String sql;
+                if (tableName.contains("All")) {
+                    sql = "DELETE FROM `" + tableName + "` WHERE name = ?";
+                } else if (tableName.equals("Value")) {
+                    if (value != null) {
+                        sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND value = ? AND host = ?";
+                    } else {
+                        sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND host = ?";
+                    }
+                } else {
+                    sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND host = ?";
+                }
+
+                ps = connection.prepareStatement(sql);
+                ps.setString(1, name);
+
+                if (tableName.contains("All")) {
+                    // All表只需要name
+                } else if (tableName.equals("Value")) {
+                    if (value != null) {
+                        ps.setString(2, value);
+                        ps.setString(3, host);
+                    } else {
+                        ps.setString(2, host);
+                    }
+                } else {
+                    ps.setString(2, host);
+                }
+
+                int affected = ps.executeUpdate();
+                return affected > 0;
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Failed to delete data: " + e.getMessage());
+            return false;
+        } finally {
+            closeQuietly(ps);
+        }
+    }
+
+    /**
+     * 批量删除数据
+     */
+    public int batchDeleteData(String host, String tableName, List<Map<String, String>> dataList) {
+        int deletedCount = 0;
+        synchronized (connection) {
+            try {
+                connection.setAutoCommit(false);
+
+                for (Map<String, String> data : dataList) {
+                    String name = data.get("name");
+                    String value = data.get("value");
+
+                    if (deleteData(host, tableName, name, value)) {
+                        deletedCount++;
+                    }
+                }
+
+                connection.commit();
+            } catch (Exception e) {
+                api.logging().logToError("Failed to batch delete data: " + e.getMessage());
+                try {
+                    connection.rollback();
+                } catch (SQLException ex) {
+                    api.logging().logToError("Failed to rollback: " + ex.getMessage());
+                }
+            } finally {
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException ex) {
+                    api.logging().logToError("Failed to set auto commit: " + ex.getMessage());
+                }
+            }
+        }
+        return deletedCount;
     }
 
     public Connection getConnection() {

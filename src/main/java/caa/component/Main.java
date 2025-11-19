@@ -4,6 +4,7 @@ import burp.api.montoya.MontoyaApi;
 import caa.component.generator.Generator;
 import caa.instances.Database;
 import caa.utils.ConfigLoader;
+import caa.utils.UIEnhancer;
 
 import javax.swing.*;
 import java.awt.*;
@@ -34,13 +35,13 @@ public class Main extends JPanel {
         JTabbedPane mainTabbedPane = new JTabbedPane();
 
         JTabbedPane CaATabbedPane = new JTabbedPane();
-        boolean isDarkBg = isDarkBg(CaATabbedPane);
+        boolean isDarkBg = UIEnhancer.isDarkColor(CaATabbedPane.getBackground());
         CaATabbedPane.addTab("", getImageIcon(isDarkBg), mainTabbedPane);
         // 中文Slogan：信息洞察，智探千方
         CaATabbedPane.addTab(" Collector and Analyzer - Insight into information, exploring with intelligence in a thousand ways. ", null);
         CaATabbedPane.setEnabledAt(1, false);
         CaATabbedPane.addPropertyChangeListener("background", e -> {
-            CaATabbedPane.setIconAt(0, getImageIcon(isDarkBg(CaATabbedPane)));
+            CaATabbedPane.setIconAt(0, getImageIcon(UIEnhancer.isDarkColor(CaATabbedPane.getBackground())));
         });
 
         add(CaATabbedPane, new GridBagConstraints(0, 0, 1, 1, 0.0, 0.0,
@@ -64,15 +65,5 @@ public class Main extends JPanel {
         Image originalImage = originalIcon.getImage();
         Image scaledImage = originalImage.getScaledInstance(30, 20, Image.SCALE_AREA_AVERAGING);
         return new ImageIcon(scaledImage);
-    }
-
-    private boolean isDarkBg(JTabbedPane CaATabbedPane) {
-        Color bg = CaATabbedPane.getBackground();
-        int r = bg.getRed();
-        int g = bg.getGreen();
-        int b = bg.getBlue();
-        int avg = (r + g + b) / 3;
-
-        return avg < 128;
     }
 }
