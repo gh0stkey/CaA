@@ -74,6 +74,9 @@ public class Databoard extends JPanel {
         this.configLoader = configLoader;
         this.generator = generator;
 
+        // 注册缓存失效回调，当数据库插入数据时自动清空缓存
+        db.setCacheInvalidationCallback(this::clearHostCache);
+
         initComponents();
     }
 
@@ -311,5 +314,9 @@ public class Databoard extends JPanel {
         }
 
         isMatchHost = false;
+    }
+    
+    public void clearHostCache() {
+        hostCache.clear();
     }
 }

@@ -11,6 +11,7 @@ import java.util.*;
 public class Database {
     private final MontoyaApi api;
     private Connection connection = null;
+    private Runnable cacheInvalidationCallback = null;
 
     public Database(MontoyaApi api, String dbFileName) {
         this.api = api;
@@ -316,6 +317,15 @@ public class Database {
                     }
                 }
                 connection.commit();
+                
+                // 数据插入成功后，触发缓存失效回调
+                if (cacheInvalidationCallback != null) {
+                    try {
+                        cacheInvalidationCallback.run();
+                    } catch (Exception callbackEx) {
+                        api.logging().logToError("Cache invalidation callback failed: " + callbackEx.getMessage());
+                    }
+                }
             } catch (Exception e) {
                 api.logging().logToError("Failed to insert data: " + e.getMessage());
                 if (connection != null) {
@@ -526,6 +536,13 @@ public class Database {
 
     public Connection getConnection() {
         return this.connection;
+    }
+    
+    /**
+     * 设置缓存失效回调，当数据插入时会调用此回调
+     */
+    public void setCacheInvalidationCallback(Runnable callback) {
+        this.cacheInvalidationCallback = callback;
     }
 
 }
