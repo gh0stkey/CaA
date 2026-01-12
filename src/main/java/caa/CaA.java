@@ -20,7 +20,7 @@ public class CaA implements BurpExtension {
     public void initialize(MontoyaApi api) {
         // 设置扩展名称
         api.extension().setName("CaA - Collector and Analyzer");
-        String version = "2.1";
+        String version = "2.1.1";
 
         // 加载扩展后输出的项目信息
         Logging logging = api.logging();

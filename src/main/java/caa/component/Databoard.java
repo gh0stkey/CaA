@@ -48,7 +48,11 @@ public class Databoard extends JPanel {
                 return;
             }
             String selected = selectedItem.toString();
+            
+            // 立即清空面板并刷新UI，防止旧数据停留
             dataPanel.removeAll();
+            dataPanel.revalidate();
+            dataPanel.repaint();
 
             if (selected.contains("All")) {
                 hostTextField.setEnabled(false);
@@ -211,11 +215,18 @@ public class Databoard extends JPanel {
                     handleComboBoxWorker.cancel(true);
                 }
 
+                // 立即显示加载提示
+                dataPanel.removeAll();
+                JLabel loadingLabel = new JLabel("Loading...", SwingConstants.CENTER);
+                loadingLabel.setForeground(Color.GRAY);
+                dataPanel.add(loadingLabel, BorderLayout.CENTER);
+                dataPanel.revalidate();
+                dataPanel.repaint();
+
                 handleComboBoxWorker = new SwingWorker<Object, Void>() {
                     @Override
                     protected Object doInBackground() {
                         String limitSize = limitComboBox.getSelectedItem().toString();
-                        dataPanel.removeAll();
                         return db.selectData(selectedHost.equals("*") ? "" : selectedHost, tableName, limitSize);
                     }
 
@@ -224,19 +235,45 @@ public class Databoard extends JPanel {
                         if (!isCancelled()) {
                             try {
                                 Object selectedObject = get();
-
-                                if (tableName.equals("Value")) {
-                                    List<String> columnNameB = new ArrayList<>();
-                                    columnNameB.add("Name");
-                                    columnNameB.add("Value");
-                                    columnNameB.add("Count");
-                                    dataPanel.add(new Datatable(api, db, configLoader, generator, columnNameB, selectedObject, null, tableName, Mode.COUNT), BorderLayout.CENTER);
-                                } else {
-                                    List<String> columnNameA = new ArrayList<>();
-                                    columnNameA.add("Name");
-                                    columnNameA.add("Count");
-                                    dataPanel.add(new Datatable(api, db, configLoader, generator, columnNameA, selectedObject, null, tableName, Mode.COUNT), BorderLayout.CENTER);
+                                
+                                dataPanel.removeAll();
+                                
+                                // 检查数据是否为空
+                                boolean hasData = false;
+                                if (selectedObject != null) {
+                                    if (selectedObject instanceof Map) {
+                                        hasData = !((Map<?, ?>) selectedObject).isEmpty();
+                                    } else if (selectedObject instanceof com.google.common.collect.SetMultimap) {
+                                        hasData = !((com.google.common.collect.SetMultimap<?, ?>) selectedObject).isEmpty();
+                                    }
                                 }
+                                
+                                if (hasData) {
+                                    Datatable datatableComponent;
+                                    if (tableName.equals("Value")) {
+                                        List<String> columnNameB = new ArrayList<>();
+                                        columnNameB.add("Name");
+                                        columnNameB.add("Value");
+                                        columnNameB.add("Count");
+                                        datatableComponent = new Datatable(api, db, configLoader, generator, columnNameB, selectedObject, null, tableName, Mode.COUNT);
+                                    } else {
+                                        List<String> columnNameA = new ArrayList<>();
+                                        columnNameA.add("Name");
+                                        columnNameA.add("Count");
+                                        datatableComponent = new Datatable(api, db, configLoader, generator, columnNameA, selectedObject, null, tableName, Mode.COUNT);
+                                    }
+                                    // 设置当前host，用于删除操作
+                                    datatableComponent.setCurrentHost(selectedHost.equals("*") ? "" : selectedHost);
+                                    dataPanel.add(datatableComponent, BorderLayout.CENTER);
+                                } else {
+                                    JLabel noDataLabel = new JLabel("No data found", SwingConstants.CENTER);
+                                    noDataLabel.setForeground(Color.GRAY);
+                                    noDataLabel.setFont(noDataLabel.getFont().deriveFont(14f));
+                                    dataPanel.add(noDataLabel, BorderLayout.CENTER);
+                                }
+                                
+                                dataPanel.revalidate();
+                                dataPanel.repaint();
 
                                 if (!selectedHost.equals(previousHostText)) {
                                     hostTextField.setText(selectedHost);
@@ -244,6 +281,12 @@ public class Databoard extends JPanel {
                                 hostComboBox.setPopupVisible(false);
                             } catch (Exception ex) {
                                 api.logging().logToError("Failed to process data panel: " + ex.getMessage());
+                                dataPanel.removeAll();
+                                JLabel errorLabel = new JLabel("Error loading data", SwingConstants.CENTER);
+                                errorLabel.setForeground(Color.RED);
+                                dataPanel.add(errorLabel, BorderLayout.CENTER);
+                                dataPanel.revalidate();
+                                dataPanel.repaint();
                             }
                         }
                     }

@@ -185,9 +185,6 @@ public class Collector implements ScanCheck {
         }
     }
 
-    /**
-     * 处理路径，分离文件和路径
-     */
     private void processPath(String path, Set<String> pathList, Set<String> fileList, Set<String> fullPathList) {
         if ("/".equals(path)) {
             return;
@@ -206,9 +203,6 @@ public class Collector implements ScanCheck {
         }
     }
 
-    /**
-     * 处理请求参数
-     */
     private void processParameters(List<ParsedHttpParameter> paramsList, Set<String> paramList, SetMultimap<String, String> valueList) {
         for (ParsedHttpParameter param : paramsList) {
             String paramName = httpUtils.decodeParameter(param.name()).trim().replaceAll("\\?", "");
@@ -230,9 +224,6 @@ public class Collector implements ScanCheck {
         }
     }
 
-    /**
-     * 处理响应体（JSON和HTML）
-     */
     private void processResponseBody(ByteArray responseBodyBytes, Set<String> paramList, SetMultimap<String, String> valueList) {
         String hashIndex = HashCalculator.calculateHash(responseBodyBytes.getBytes());
         Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
@@ -257,9 +248,6 @@ public class Collector implements ScanCheck {
         }
     }
 
-    /**
-     * 解析HTML中的input标签
-     */
     private void processHtmlInputs(String html, Set<String> paramList, SetMultimap<String, String> valueList) {
         try {
             Document doc = Jsoup.parse(html);
@@ -286,9 +274,6 @@ public class Collector implements ScanCheck {
         }
     }
 
-    /**
-     * 应用缓存数据
-     */
     private void applyCachedData(Map<String, Object> cachePool, SetMultimap<String, String> valueList, Set<String> paramList) {
         Object cachedValueList = cachePool.get("jsonKeyValue");
         Object cachedParamList = cachePool.get("jsonKey");
@@ -300,9 +285,6 @@ public class Collector implements ScanCheck {
         }
     }
 
-    /**
-     * 处理只有响应没有请求的情况
-     */
     private void processResponseOnly(HttpResponse response, SetMultimap<String, String> valueList, Set<String> paramList) {
         if (response != null) {
             String hashIndex = HashCalculator.calculateHash(response.body().getBytes());
@@ -313,10 +295,6 @@ public class Collector implements ScanCheck {
         }
     }
 
-    /**
-     * 收集HTTP请求响应中的数据，不存储到数据库，直接返回结果
-     * 用于ResponseEditor等组件
-     */
     public Map<String, Object> collect(HttpRequestResponse baseRequestResponse) {
         Map<String, Object> resultMap = new HashMap<>();
         Set<String> pathList = new HashSet<>();

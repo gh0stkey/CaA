@@ -252,7 +252,7 @@ public class Datatable extends JPanel {
                 if (SwingUtilities.isRightMouseButton(e)) {
                     popupMenu.removeAll();
 
-                    if (tabName.equals("Param") || tabName.equals("Value")) {
+                    if (tabName.contains("Param") || tabName.equals("Value")) {
                         popupMenu.add(copyMenu);
                     }
 
@@ -345,9 +345,6 @@ public class Datatable extends JPanel {
         };
     }
 
-    /**
-     * 填充表格数据
-     */
     private void populateTableData() {
         if (mode == Mode.COUNT) {
             if (columnSize > 2) {

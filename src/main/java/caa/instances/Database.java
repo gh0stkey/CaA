@@ -440,15 +440,6 @@ public class Database {
         }
     }
 
-    /**
-     * 删除数据
-     *
-     * @param host      主机名（对于All表传空字符串）
-     * @param tableName 表名
-     * @param name      要删除的name值
-     * @param value     要删除的value值（仅对Value表有效）
-     * @return 是否删除成功
-     */
     public boolean deleteData(String host, String tableName, String name, String value) {
         PreparedStatement ps = null;
         try {
@@ -457,17 +448,32 @@ public class Database {
                     return false;
                 }
 
+                // 判断是否是通配符查询
+                boolean isLikeQuery = host.contains("*.");
                 String sql;
+                
                 if (tableName.contains("All")) {
                     sql = "DELETE FROM `" + tableName + "` WHERE name = ?";
                 } else if (tableName.equals("Value")) {
                     if (value != null) {
-                        sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND value = ? AND host = ?";
+                        if (isLikeQuery) {
+                            sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND value = ? AND host LIKE ?";
+                        } else {
+                            sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND value = ? AND host = ?";
+                        }
+                    } else {
+                        if (isLikeQuery) {
+                            sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND host LIKE ?";
+                        } else {
+                            sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND host = ?";
+                        }
+                    }
+                } else {
+                    if (isLikeQuery) {
+                        sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND host LIKE ?";
                     } else {
                         sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND host = ?";
                     }
-                } else {
-                    sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND host = ?";
                 }
 
                 ps = connection.prepareStatement(sql);
@@ -478,12 +484,24 @@ public class Database {
                 } else if (tableName.equals("Value")) {
                     if (value != null) {
                         ps.setString(2, value);
-                        ps.setString(3, host);
+                        if (isLikeQuery) {
+                            ps.setString(3, "%" + host.replace("*.", "."));
+                        } else {
+                            ps.setString(3, host);
+                        }
+                    } else {
+                        if (isLikeQuery) {
+                            ps.setString(2, "%" + host.replace("*.", "."));
+                        } else {
+                            ps.setString(2, host);
+                        }
+                    }
+                } else {
+                    if (isLikeQuery) {
+                        ps.setString(2, "%" + host.replace("*.", "."));
                     } else {
                         ps.setString(2, host);
                     }
-                } else {
-                    ps.setString(2, host);
                 }
 
                 int affected = ps.executeUpdate();
@@ -497,9 +515,6 @@ public class Database {
         }
     }
 
-    /**
-     * 批量删除数据
-     */
     public int batchDeleteData(String host, String tableName, List<Map<String, String>> dataList) {
         int deletedCount = 0;
         synchronized (connection) {
@@ -537,10 +552,7 @@ public class Database {
     public Connection getConnection() {
         return this.connection;
     }
-    
-    /**
-     * 设置缓存失效回调，当数据插入时会调用此回调
-     */
+
     public void setCacheInvalidationCallback(Runnable callback) {
         this.cacheInvalidationCallback = callback;
     }
