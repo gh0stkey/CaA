@@ -1,0 +1,108 @@
+name: Cache Cleanup
+
+on:
+  # PR 合并/关闭时清理该分支的缓存
+  pull_request:
+    types: [closed]
+
+  # 每周一 UTC 00:00 清理过期缓存
+  schedule:
+    - cron: '0 0 * * 1'
+
+  # 支持手动触发
+  workflow_dispatch:
+
+jobs:
+  # PR 关闭时：清理该 PR 分支产生的所有缓存
+  cleanup-pr-caches:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Cleanup caches for branch ${{ github.head_ref }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+            const prNumber = context.payload.pull_request.number;
+
+            const refs = [
+              `refs/heads/${branch}`,
+              `refs/pull/${prNumber}/merge`,
+            ];
+
+            let deleted = 0;
+            let freedMB = 0;
+
+            for (const ref of refs) {
+              console.log(`Cleaning up caches for ref: ${ref}`);
+              const caches = await github.rest.actions.getActionsCacheList({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref,
+              });
+
+              for (const cache of caches.data.actions_caches) {
+                console.log(`  Deleting: ${cache.key} (${(cache.size_in_bytes / 1024 / 1024).toFixed(1)} MB)`);
+                await github.rest.actions.deleteActionsCacheById({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  cache_id: cache.id,
+                });
+                deleted++;
+                freedMB += cache.size_in_bytes / 1024 / 1024;
+              }
+            }
+
+            console.log(`Done. Deleted ${deleted} caches, freed ${freedMB.toFixed(1)} MB.`);
+
+  # 定时/手动：清理超过 7 天未使用的缓存
+  cleanup-stale-caches:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Cleanup stale caches (>7 days unused)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const maxAgeDays = 7;
+            const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
+            console.log(`Deleting caches not used since: ${cutoff.toISOString()}`);
+
+            let page = 1;
+            let deleted = 0;
+            let freedMB = 0;
+
+            while (true) {
+              const { data } = await github.rest.actions.getActionsCacheList({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+                page,
+              });
+
+              if (data.actions_caches.length === 0) break;
+
+              for (const cache of data.actions_caches) {
+                const lastUsed = new Date(cache.last_accessed_at);
+                if (lastUsed < cutoff) {
+                  const sizeMB = (cache.size_in_bytes / 1024 / 1024).toFixed(1);
+                  console.log(`  Deleting: ${cache.key} (${sizeMB} MB, last used: ${cache.last_accessed_at})`);
+                  await github.rest.actions.deleteActionsCacheById({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    cache_id: cache.id,
+                  });
+                  deleted++;
+                  freedMB += cache.size_in_bytes / 1024 / 1024;
+                }
+              }
+
+              if (data.actions_caches.length < 100) break;
+              page++;
+            }
+
+            console.log(`Done. Deleted ${deleted} stale caches, freed ${freedMB.toFixed(1)} MB.`);

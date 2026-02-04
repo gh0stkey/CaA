@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    # 对所有分支进行 CI 检查
+    branches: ['**']
+  pull_request:
+    branches: [master]
+
+jobs:
+  # ==========================================
+  # Quick Check (极速反馈) - 所有分支的每次 push 都运行
+  # 包含: Java 编译检查
+  # ==========================================
+  quick-check:
+    name: Quick Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile check
+        run: ./gradlew compileJava
+
+  # ==========================================
+  # Build Test (构建验证) - 仅 PR 到 master 时运行
+  # 包含: 完整 Fat JAR 构建
+  # ==========================================
+  build-test:
+    name: Build Test
+    runs-on: ubuntu-latest
+    needs: quick-check
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # 完整构建验证
+      - name: Build Fat JAR
+        run: ./gradlew clean jar
+
+      - name: Verify JAR artifact
+        run: |
+          JAR_FILE="build/libs/CaA.jar"
+          if [ ! -f "$JAR_FILE" ]; then
+            echo "::error::JAR file not found: $JAR_FILE"
+            exit 1
+          fi
+          JAR_SIZE=$(du -h "$JAR_FILE" | cut -f1)
+          echo "## 📦 Build Artifact" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`CaA.jar\` | $JAR_SIZE |" >> $GITHUB_STEP_SUMMARY
+          echo "✅ JAR built successfully: $JAR_FILE ($JAR_SIZE)"
+
+  # ==========================================
+  # Dependency Check (依赖检查) - 仅 PR 到 master 时运行
+  # 非阻塞：仅作为参考信息，不阻止合并
+  # ==========================================
+  dependency-check:
+    name: Dependency Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Check dependency resolution
+        run: |
+          echo "## 📋 Dependency Report" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          ./gradlew dependencies --configuration runtimeClasspath 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
