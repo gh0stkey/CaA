@@ -224,27 +224,38 @@ public class Collector implements ScanCheck {
         }
     }
 
-    private void processResponseBody(ByteArray responseBodyBytes, Set<String> paramList, SetMultimap<String, String> valueList) {
+    private boolean processResponseBodyJson(ByteArray responseBodyBytes, Set<String> paramList, SetMultimap<String, String> valueList) {
         String hashIndex = HashCalculator.calculateHash(responseBodyBytes.getBytes());
         Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
 
-        if (cachePool == null) {
+        if (cachePool != null) {
+            processJsonData(cachePool, valueList, paramList);
+            return true;
+        }
+
+        try {
+            String responseBody = new String(responseBodyBytes.getBytes(), StandardCharsets.UTF_8);
+            Map<String, Object> jsonData = getJsonData(responseBody);
+            if (jsonData != null) {
+                processJsonData(jsonData, valueList, paramList);
+                CachePool.addToCache(hashIndex, jsonData);
+                return true;
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Failed to parse response body JSON: " + e.getMessage());
+        }
+
+        return false;
+    }
+
+    private void processResponseBody(ByteArray responseBodyBytes, Set<String> paramList, SetMultimap<String, String> valueList) {
+        if (!processResponseBodyJson(responseBodyBytes, paramList, valueList)) {
             try {
                 String responseBody = new String(responseBodyBytes.getBytes(), StandardCharsets.UTF_8);
-                Map<String, Object> jsonData = getJsonData(responseBody);
-
-                if (jsonData != null) {
-                    processJsonData(jsonData, valueList, paramList);
-                    CachePool.addToCache(hashIndex, jsonData);
-                } else {
-                    // 尝试解析HTML
-                    processHtmlInputs(responseBody, paramList, valueList);
-                }
+                processHtmlInputs(responseBody, paramList, valueList);
             } catch (Exception e) {
-                api.logging().logToError("Failed to parse response body: " + e.getMessage());
+                api.logging().logToError("Failed to parse response body HTML: " + e.getMessage());
             }
-        } else {
-            applyCachedData(cachePool, valueList, paramList);
         }
     }
 
@@ -274,24 +285,9 @@ public class Collector implements ScanCheck {
         }
     }
 
-    private void applyCachedData(Map<String, Object> cachePool, SetMultimap<String, String> valueList, Set<String> paramList) {
-        Object cachedValueList = cachePool.get("jsonKeyValue");
-        Object cachedParamList = cachePool.get("jsonKey");
-        if (cachedValueList != null) {
-            valueList.putAll((SetMultimap) cachedValueList);
-        }
-        if (cachedParamList != null) {
-            paramList.addAll((HashSet) cachedParamList);
-        }
-    }
-
     private void processResponseOnly(HttpResponse response, SetMultimap<String, String> valueList, Set<String> paramList) {
         if (response != null) {
-            String hashIndex = HashCalculator.calculateHash(response.body().getBytes());
-            Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
-            if (cachePool != null) {
-                applyCachedData(cachePool, valueList, paramList);
-            }
+            processResponseBodyJson(response.body(), paramList, valueList);
         }
     }
 
@@ -323,23 +319,7 @@ public class Collector implements ScanCheck {
 
                 // 处理响应数据（只解析JSON，不解析HTML）
                 if (response != null) {
-                    String hashIndex = HashCalculator.calculateHash(response.body().getBytes());
-                    Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
-
-                    if (cachePool == null) {
-                        try {
-                            String responseBody = new String(response.body().getBytes(), StandardCharsets.UTF_8);
-                            Map<String, Object> jsonData = getJsonData(responseBody);
-                            if (jsonData != null) {
-                                processJsonData(jsonData, valueList, paramList);
-                                CachePool.addToCache(hashIndex, jsonData);
-                            }
-                        } catch (Exception e) {
-                            api.logging().logToError("Failed to parse response in collect: " + e.getMessage());
-                        }
-                    } else {
-                        applyCachedData(cachePool, valueList, paramList);
-                    }
+                    processResponseBodyJson(response.body(), paramList, valueList);
                 }
             }
         }

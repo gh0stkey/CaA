@@ -236,13 +236,7 @@ public class Config extends JPanel {
     }
 
     private void addDataToTable(String data, DefaultTableModel model) {
-        if (!data.isBlank()) {
-            String[] rows = data.split("\\r?\\n");
-            for (String row : rows) {
-                model.addRow(new String[]{row});
-            }
-            UIEnhancer.deduplicateTableData(model);
-        }
+        UIEnhancer.addDataToTable(data, model, false, s -> s);
     }
 
 

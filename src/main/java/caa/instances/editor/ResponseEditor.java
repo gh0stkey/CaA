@@ -11,6 +11,7 @@ import burp.api.montoya.ui.editor.extension.EditorCreationContext;
 import burp.api.montoya.ui.editor.extension.ExtensionProvidedHttpResponseEditor;
 import burp.api.montoya.ui.editor.extension.HttpResponseEditorProvider;
 import caa.component.datatable.Datatable;
+import caa.component.datatable.DatatableContext;
 import caa.component.datatable.Mode;
 import caa.component.generator.Generator;
 import caa.instances.Collector;
@@ -50,6 +51,7 @@ public class ResponseEditor implements HttpResponseEditorProvider {
         private final Generator generator;
 
         private final HttpUtils httpUtils;
+        private final Collector collector;
         private final JTabbedPane jTabbedPane;
         private final EditorCreationContext creationContext;
         private Datatable dataPanel;
@@ -64,6 +66,7 @@ public class ResponseEditor implements HttpResponseEditorProvider {
             this.generator = generator;
 
             this.httpUtils = new HttpUtils(api, configLoader);
+            this.collector = new Collector(api, db, configLoader);
             this.creationContext = creationContext;
             this.jTabbedPane = new JTabbedPane();
         }
@@ -102,7 +105,6 @@ public class ResponseEditor implements HttpResponseEditorProvider {
                 }
 
                 if (!matches) {
-                    Collector collector = new Collector(api, db, configLoader);
                     dataMap = new LinkedHashMap<>(collector.collect(requestResponse));
 
                     return !dataMap.isEmpty();
@@ -160,7 +162,8 @@ public class ResponseEditor implements HttpResponseEditorProvider {
                 if (i.equals("Value")) {
                     columnNameA.add("Value");
                 }
-                component = new Datatable(api, db, configLoader, generator, columnNameA, dataMap.get(i), httpRequest, i, Mode.STANDARD);
+                DatatableContext ctx = new DatatableContext(api, db, configLoader, generator, httpRequest);
+                component = new Datatable(ctx, columnNameA, dataMap.get(i), i, Mode.STANDARD);
                 jTabbedPane.addTab(i, component);
             }
 

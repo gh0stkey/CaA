@@ -3,6 +3,7 @@ package caa.component;
 import burp.api.montoya.MontoyaApi;
 import caa.Config;
 import caa.component.datatable.Datatable;
+import caa.component.datatable.DatatableContext;
 import caa.component.datatable.Mode;
 import caa.component.generator.Generator;
 import caa.instances.Database;
@@ -11,8 +12,6 @@ import caa.utils.HttpUtils;
 import caa.utils.UIEnhancer;
 
 import javax.swing.*;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -31,7 +30,7 @@ public class Databoard extends JPanel {
     private final String defaultText = "Please enter the host";
     private final DefaultComboBoxModel comboBoxModel = new DefaultComboBoxModel();
     private final JComboBox hostComboBox = new JComboBox(comboBoxModel);
-    private Map<String, List<String>> hostCache = new HashMap<>();
+    private volatile Map<String, List<String>> hostCache = new HashMap<>();
     private JTextField hostTextField;
     private JComboBox<String> tableComboBox;
     private JComboBox<String> limitComboBox;
@@ -138,22 +137,7 @@ public class Databoard extends JPanel {
             }
         });
 
-        hostTextField.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                filterComboBoxList();
-            }
-
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                filterComboBoxList();
-            }
-
-            @Override
-            public void changedUpdate(DocumentEvent e) {
-                filterComboBoxList();
-            }
-        });
+        UIEnhancer.addSimpleDocumentListener(hostTextField, this::filterComboBoxList);
     }
 
     private void filterComboBoxList() {
@@ -255,12 +239,14 @@ public class Databoard extends JPanel {
                                         columnNameB.add("Name");
                                         columnNameB.add("Value");
                                         columnNameB.add("Count");
-                                        datatableComponent = new Datatable(api, db, configLoader, generator, columnNameB, selectedObject, null, tableName, Mode.COUNT);
+                                        DatatableContext ctx = new DatatableContext(api, db, configLoader, generator, null);
+                                        datatableComponent = new Datatable(ctx, columnNameB, selectedObject, tableName, Mode.COUNT);
                                     } else {
                                         List<String> columnNameA = new ArrayList<>();
                                         columnNameA.add("Name");
                                         columnNameA.add("Count");
-                                        datatableComponent = new Datatable(api, db, configLoader, generator, columnNameA, selectedObject, null, tableName, Mode.COUNT);
+                                        DatatableContext ctx = new DatatableContext(api, db, configLoader, generator, null);
+                                        datatableComponent = new Datatable(ctx, columnNameA, selectedObject, tableName, Mode.COUNT);
                                     }
                                     // 设置当前host，用于删除操作
                                     datatableComponent.setCurrentHost(selectedHost.equals("*") ? "" : selectedHost);
@@ -360,6 +346,6 @@ public class Databoard extends JPanel {
     }
     
     public void clearHostCache() {
-        hostCache.clear();
+        hostCache = new HashMap<>();
     }
 }

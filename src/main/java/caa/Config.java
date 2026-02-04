@@ -1,6 +1,5 @@
 package caa;
 
-import java.util.LinkedList;
 import java.util.List;
 
 public class Config {
@@ -29,5 +28,5 @@ public class Config {
             "All FullPath"
     };
 
-    public static List<String> globalPayload = new LinkedList<>();
+    public static volatile List<String> globalPayload = List.of();
 }

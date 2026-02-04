@@ -1,6 +1,8 @@
 package caa.utils;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
@@ -12,6 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 public class UIEnhancer {
     public static void addButtonListener(JButton pasteButton, JButton removeButton, JButton clearButton, JTable table, DefaultTableModel model, BiConsumer<String, DefaultTableModel> addDataToTable) {
@@ -132,5 +135,43 @@ public class UIEnhancer {
     public static boolean hasUserInput(JTextField field) {
         Object prop = field.getClientProperty("isPlaceholder");
         return prop instanceof Boolean && !((Boolean) prop);
+    }
+
+    public static void addSimpleDocumentListener(JTextField field, Runnable action) {
+        field.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                action.run();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                action.run();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                action.run();
+            }
+        });
+    }
+
+    public static void addDataToTable(String data, DefaultTableModel model, boolean parseKeyValue, Function<String, String> valueDecoder) {
+        if (data.isBlank()) {
+            return;
+        }
+
+        String[] rows = data.split("\\r?\\n");
+        for (String row : rows) {
+            String[] cellData;
+            if (parseKeyValue && row.contains("=")) {
+                cellData = new String[]{row.split("=")[0], valueDecoder.apply(row.split("=")[1])};
+            } else {
+                cellData = new String[]{row};
+            }
+            model.addRow(cellData);
+        }
+
+        deduplicateTableData(model);
     }
 }
