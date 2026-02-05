@@ -48,9 +48,6 @@ public class Database {
             // 设置mmap大小以提升读取性能
             statement.executeUpdate("PRAGMA mmap_size = 268435456;"); // 256MB
 
-            // 使用内存临时存储
-            statement.executeUpdate("PRAGMA temp_store = MEMORY;");
-
             // 初始化数据表
             createTables();
 
@@ -448,60 +445,24 @@ public class Database {
                     return false;
                 }
 
-                // 判断是否是通配符查询
                 boolean isLikeQuery = host.contains("*.");
-                String sql;
-                
-                if (tableName.contains("All")) {
-                    sql = "DELETE FROM `" + tableName + "` WHERE name = ?";
-                } else if (tableName.equals("Value")) {
-                    if (value != null) {
-                        if (isLikeQuery) {
-                            sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND value = ? AND host LIKE ?";
-                        } else {
-                            sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND value = ? AND host = ?";
-                        }
-                    } else {
-                        if (isLikeQuery) {
-                            sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND host LIKE ?";
-                        } else {
-                            sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND host = ?";
-                        }
-                    }
-                } else {
-                    if (isLikeQuery) {
-                        sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND host LIKE ?";
-                    } else {
-                        sql = "DELETE FROM `" + tableName + "` WHERE name = ? AND host = ?";
-                    }
+                StringBuilder sql = new StringBuilder("DELETE FROM `" + tableName + "` WHERE name = ?");
+                List<String> params = new ArrayList<>();
+                params.add(name);
+
+                if (tableName.equals("Value") && value != null) {
+                    sql.append(" AND value = ?");
+                    params.add(value);
                 }
 
-                ps = connection.prepareStatement(sql);
-                ps.setString(1, name);
+                if (!tableName.contains("All")) {
+                    sql.append(isLikeQuery ? " AND host LIKE ?" : " AND host = ?");
+                    params.add(isLikeQuery ? "%" + host.replace("*.", ".") : host);
+                }
 
-                if (tableName.contains("All")) {
-                    // All表只需要name
-                } else if (tableName.equals("Value")) {
-                    if (value != null) {
-                        ps.setString(2, value);
-                        if (isLikeQuery) {
-                            ps.setString(3, "%" + host.replace("*.", "."));
-                        } else {
-                            ps.setString(3, host);
-                        }
-                    } else {
-                        if (isLikeQuery) {
-                            ps.setString(2, "%" + host.replace("*.", "."));
-                        } else {
-                            ps.setString(2, host);
-                        }
-                    }
-                } else {
-                    if (isLikeQuery) {
-                        ps.setString(2, "%" + host.replace("*.", "."));
-                    } else {
-                        ps.setString(2, host);
-                    }
+                ps = connection.prepareStatement(sql.toString());
+                for (int i = 0; i < params.size(); i++) {
+                    ps.setString(i + 1, params.get(i));
                 }
 
                 int affected = ps.executeUpdate();

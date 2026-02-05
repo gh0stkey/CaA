@@ -13,8 +13,6 @@ import caa.utils.UIEnhancer;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.*;
@@ -94,30 +92,12 @@ public class Tab extends JPanel {
         JPanel urlPanel = new JPanel(new BorderLayout(10, 0));
         JLabel urlLabel = new JLabel("URL:");
         urlField = new JTextField(httpRequest.url());
-        urlField.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                changeAction();
-            }
-
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                changeAction();
-            }
-
-            @Override
-            public void changedUpdate(DocumentEvent e) {
-                changeAction();
-            }
-
-            private void changeAction() {
-                // 改动就重组
-                try {
-                    HttpService httpService = HttpService.httpService(urlField.getText());
-                    requestEditor.setRequest(HttpRequest.httpRequest(httpService, requestEditor.getRequest().toByteArray()));
-                } catch (Exception ignored) {
-
-                }
+        UIEnhancer.addSimpleDocumentListener(urlField, () -> {
+            // 改动就重组
+            try {
+                HttpService httpService = HttpService.httpService(urlField.getText());
+                requestEditor.setRequest(HttpRequest.httpRequest(httpService, requestEditor.getRequest().toByteArray()));
+            } catch (Exception ignored) {
             }
         });
 
@@ -401,23 +381,6 @@ public class Tab extends JPanel {
     }
 
     private void addDataToTable(String data, DefaultTableModel model) {
-        if (data.isBlank()) {
-            return;
-        }
-
-        String[] rows = data.split("\\r?\\n");
-        for (String row : rows) {
-            String[] cellData;
-
-            if (row.contains("=")) {
-                cellData = new String[]{row.split("=")[0], httpUtils.decodeParameter(row.split("=")[1])};
-            } else {
-                cellData = new String[]{row};
-            }
-
-            model.addRow(cellData);
-        }
-
-        UIEnhancer.deduplicateTableData(model);
+        UIEnhancer.addDataToTable(data, model, true, httpUtils::decodeParameter);
     }
 }

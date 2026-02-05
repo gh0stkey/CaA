@@ -5,13 +5,10 @@ import burp.api.montoya.http.message.requests.HttpRequest;
 import caa.component.generator.Generator;
 import caa.instances.Database;
 import caa.instances.payload.PayloadGenerator;
-import caa.utils.ConfigLoader;
 import caa.utils.UIEnhancer;
 import com.google.common.collect.SetMultimap;
 
 import javax.swing.*;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
@@ -31,7 +28,6 @@ public class Datatable extends JPanel {
     private final JTextField secondSearchField;
     private final TableRowSorter<DefaultTableModel> sorter;
     private final MontoyaApi api;
-    private final ConfigLoader configLoader;
     private final Generator generator;
     private final JCheckBox searchMode = new JCheckBox("Reverse search");
     private final JCheckBox regexMode = new JCheckBox("Regex mode");
@@ -44,16 +40,15 @@ public class Datatable extends JPanel {
     private final Mode mode;
     private String currentHost = "";
 
-    public Datatable(MontoyaApi api, Database db, ConfigLoader configLoader, Generator generator, List<String> columnNameList, Object dataObj, HttpRequest httpRequest, String tabName, Mode mode) {
-        this.api = api;
-        this.db = db;
-        this.configLoader = configLoader;
-        this.generator = generator;
+    public Datatable(DatatableContext ctx, List<String> columnNameList, Object dataObj, String tabName, Mode mode) {
+        this.api = ctx.api();
+        this.db = ctx.db();
+        this.generator = ctx.generator();
+        this.httpRequest = ctx.httpRequest();
         this.tabName = tabName;
         this.dataObj = dataObj;
-        this.httpRequest = httpRequest;
         this.columnSize = columnNameList.size();
-        this.payloadGenerator = new PayloadGenerator(api, configLoader);
+        this.payloadGenerator = new PayloadGenerator(ctx.api(), ctx.configLoader());
         this.mode = mode;
 
         String[] columnNames = new String[columnSize + 1];
@@ -103,43 +98,11 @@ public class Datatable extends JPanel {
 
         UIEnhancer.setTextFieldPlaceholder(searchField, "Search");
 
-        searchField.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                performSearch();
-            }
-
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                performSearch();
-            }
-
-            @Override
-            public void changedUpdate(DocumentEvent e) {
-                performSearch();
-            }
-
-        });
+        UIEnhancer.addSimpleDocumentListener(searchField, this::performSearch);
 
         UIEnhancer.setTextFieldPlaceholder(secondSearchField, "Second search");
 
-        secondSearchField.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                performSearch();
-            }
-
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                performSearch();
-            }
-
-            @Override
-            public void changedUpdate(DocumentEvent e) {
-                performSearch();
-            }
-
-        });
+        UIEnhancer.addSimpleDocumentListener(secondSearchField, this::performSearch);
 
         // 设置布局
         JScrollPane scrollPane = new JScrollPane(dataTable);

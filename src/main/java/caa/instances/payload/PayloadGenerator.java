@@ -53,8 +53,7 @@ public class PayloadGenerator {
         }
 
         if (!requestList.isEmpty()) {
-            Config.globalPayload.clear();
-            putPayloads(requestList);
+            Config.globalPayload = List.copyOf(requestList.stream().map(HttpRequest::toString).toList());
         }
 
         return true;
@@ -180,12 +179,6 @@ public class PayloadGenerator {
         return paths;
     }
 
-    private void putPayloads(List<HttpRequest> httpRequestList) {
-        for (HttpRequest httpRequest : httpRequestList) {
-            Config.globalPayload.add(httpRequest.toString());
-        }
-    }
-
     private String getHttpRequestWithoutBody(HttpRequest httpRequest) {
         byte[] requestByteArray = httpRequest.toByteArray().getBytes();
         byte[] bodyByteArray = httpRequest.body().getBytes();
@@ -246,35 +239,33 @@ public class PayloadGenerator {
         }
     }
 
+    private List<String[]> parsePayloadPairs(String payload) {
+        List<String[]> pairs = new ArrayList<>();
+        for (String line : payload.split("\r\n")) {
+            if (payload.contains("=") && line.contains("=")) {
+                String param = line.split("=")[0];
+                String value = httpUtils.decodeParameter(line.split("=")[1]);
+                pairs.add(new String[]{param, value});
+            } else {
+                pairs.add(new String[]{line, generateRandomString(Config.randomType, Config.alphanumericChars, Config.defaultLength)});
+            }
+        }
+        return pairs;
+    }
+
     public String generateRawParam(String payload, String formatChar, String delimiter) {
         List<String> paramValueList = new ArrayList<>();
         String formatString = "{0}{1}{2}";
-        if (payload.contains("=")) {
-            for (String paramValue : payload.split("\r\n")) {
-                String param = paramValue.split("=")[0];
-                String value = httpUtils.decodeParameter(paramValue.split("=")[1]);
-                paramValueList.add(MessageFormat.format(formatString, param, formatChar, value));
-            }
-        } else {
-            for (String param : payload.split("\r\n")) {
-                paramValueList.add(MessageFormat.format(formatString, param, formatChar, generateRandomString(Config.randomType, Config.alphanumericChars, Config.defaultLength)));
-            }
+        for (String[] pair : parsePayloadPairs(payload)) {
+            paramValueList.add(MessageFormat.format(formatString, pair[0], formatChar, pair[1]));
         }
         return String.join(delimiter, paramValueList);
     }
 
     public String generateJsonParam(String payload) {
         JsonObject jsonObject = new JsonObject();
-        if (payload.contains("=")) {
-            for (String paramValue : payload.split("\r\n")) {
-                String param = paramValue.split("=")[0];
-                String value = httpUtils.decodeParameter(paramValue.split("=")[1]);
-                jsonObject.addProperty(param, value);
-            }
-        } else {
-            for (String param : payload.split("\r\n")) {
-                jsonObject.addProperty(param, generateRandomString(Config.randomType, Config.alphanumericChars, Config.defaultLength));
-            }
+        for (String[] pair : parsePayloadPairs(payload)) {
+            jsonObject.addProperty(pair[0], pair[1]);
         }
         return new Gson().toJson(jsonObject);
     }
@@ -282,16 +273,8 @@ public class PayloadGenerator {
     public String generateXmlParam(String payload) {
         List<String> paramValueList = new ArrayList<>();
         String formatString = "<{0}>{1}</{0}>";
-        if (payload.contains("=")) {
-            for (String paramValue : payload.split("\r\n")) {
-                String param = paramValue.split("=")[0];
-                String value = httpUtils.decodeParameter(paramValue.split("=")[1]);
-                paramValueList.add(MessageFormat.format(formatString, param, value));
-            }
-        } else {
-            for (String param : payload.split("\r\n")) {
-                paramValueList.add(MessageFormat.format(formatString, param, generateRandomString(Config.randomType, Config.alphanumericChars, Config.defaultLength)));
-            }
+        for (String[] pair : parsePayloadPairs(payload)) {
+            paramValueList.add(MessageFormat.format(formatString, pair[0], pair[1]));
         }
         return String.join("", paramValueList);
     }
