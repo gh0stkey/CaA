@@ -81,6 +81,7 @@ We appreciate everyone's support for the project. The following list is sorted b
 | 蒙蒙大   | 10.00 CNY  |
 | 耳东   | 20.00 CNY  |
 | Oyst3r   | 10.00 CNY  |
+| NOP Team | 88.00 CNY |
 
 ## Support the Project
 
