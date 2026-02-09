@@ -82,6 +82,7 @@ README 版本: \[[English](README.md) | [简体中文](README_CN.md)\]
 | 耳东   | 20.00 元  |
 | Oyst3r   | 10.00 元  |
 | NOP Team | 88.00 元 |
+| 城上 | 188.99 元 |
 
 ## 最后
 
