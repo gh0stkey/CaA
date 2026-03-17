@@ -84,6 +84,7 @@ README 版本: \[[English](README.md) | [简体中文](README_CN.md)\]
 | NOP Team | 88.00 元 |
 | 城上 | 188.99 元 |
 | Shu2e | 50.00 元 |
+| Kite | 200.00 元 |
 
 ## 最后
 
