@@ -84,6 +84,7 @@ We appreciate everyone's support for the project. The following list is sorted b
 | NOP Team | 88.00 CNY |
 | 城上 | 188.99 CNY |
 | Shu2e | 50.00 CNY |
+| Kite | 200.00 CNY |
 
 ## Support the Project
 
