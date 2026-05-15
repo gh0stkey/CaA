@@ -1,4 +1,4 @@
-package caa.instances.payload;
+package caa.instances.intruder;
 
 import burp.api.montoya.intruder.AttackConfiguration;
 import burp.api.montoya.intruder.PayloadGenerator;

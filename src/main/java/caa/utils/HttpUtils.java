@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class HttpUtils {
+
     private final MontoyaApi api;
     private final ConfigLoader configLoader;
 
@@ -18,10 +19,18 @@ public class HttpUtils {
         this.configLoader = configLoader;
     }
 
-    public static String replaceFirstOccurrence(String original, String find, String replace) {
+    public static String replaceFirstOccurrence(
+            String original,
+            String find,
+            String replace
+    ) {
         int index = original.indexOf(find);
         if (index != -1) {
-            return original.substring(0, index) + replace + original.substring(index + find.length());
+            return (
+                    original.substring(0, index) +
+                            replace +
+                            original.substring(index + find.length())
+            );
         }
         return original;
     }
@@ -57,6 +66,14 @@ public class HttpUtils {
         return input;
     }
 
+    public String encodeParameter(String input) {
+        try {
+            input = api.utilities().urlUtils().encode(input);
+        } catch (Exception ignored) {
+        }
+        return input;
+    }
+
     public String getHostByUrl(String url) {
         String host = "";
 
@@ -87,7 +104,10 @@ public class HttpUtils {
         return isBlockHost;
     }
 
-    public boolean verifyHttpRequestResponse(HttpRequestResponse requestResponse, String toolType) {
+    public boolean verifyHttpRequestResponse(
+            HttpRequestResponse requestResponse,
+            String toolType
+    ) {
         HttpRequest request = requestResponse.request();
         HttpResponse response = requestResponse.response();
         boolean retStatus = false;
@@ -104,8 +124,12 @@ public class HttpUtils {
             boolean isExcludeSuffix = false;
             String suffix = configLoader.getExcludeSuffix();
             if (!suffix.isBlank()) {
-                List<String> suffixList = Arrays.asList(configLoader.getExcludeSuffix().split("\\|"));
-                isExcludeSuffix = suffixList.contains(request.fileExtension().toLowerCase());
+                List<String> suffixList = Arrays.asList(
+                        configLoader.getExcludeSuffix().split("\\|")
+                );
+                isExcludeSuffix = suffixList.contains(
+                        request.fileExtension().toLowerCase()
+                );
             }
 
             boolean isToolScope = !configLoader.getScope().contains(toolType);
@@ -113,11 +137,19 @@ public class HttpUtils {
             boolean isExcludeStatus = false;
             String status = configLoader.getExcludeStatus();
             if (!status.isBlank()) {
-                List<String> statusList = Arrays.asList(configLoader.getExcludeStatus().split("\\|"));
-                isExcludeStatus = statusList.contains(String.valueOf(response.statusCode()));
+                List<String> statusList = Arrays.asList(
+                        configLoader.getExcludeStatus().split("\\|")
+                );
+                isExcludeStatus = statusList.contains(
+                        String.valueOf(response.statusCode())
+                );
             }
 
-            retStatus = isExcludeSuffix || isBlockHost || isToolScope || isExcludeStatus;
+            retStatus =
+                    isExcludeSuffix ||
+                            isBlockHost ||
+                            isToolScope ||
+                            isExcludeStatus;
         } catch (Exception ignored) {
         }
 

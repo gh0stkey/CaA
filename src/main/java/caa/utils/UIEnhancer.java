@@ -9,6 +9,8 @@ import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -17,11 +19,22 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 public class UIEnhancer {
-    public static void addButtonListener(JButton pasteButton, JButton removeButton, JButton clearButton, JTable table, DefaultTableModel model, BiConsumer<String, DefaultTableModel> addDataToTable) {
+
+    public static void addButtonListener(
+            JButton pasteButton,
+            JButton removeButton,
+            JButton clearButton,
+            JTable table,
+            DefaultTableModel model,
+            BiConsumer<String, DefaultTableModel> addDataToTable
+    ) {
         pasteButton.addActionListener(e -> {
-            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+            Clipboard clipboard =
+                    Toolkit.getDefaultToolkit().getSystemClipboard();
             try {
-                String data = (String) clipboard.getData(DataFlavor.stringFlavor);
+                String data = (String) clipboard.getData(
+                        DataFlavor.stringFlavor
+                );
 
                 if (data != null && !data.isEmpty()) {
                     addDataToTable.accept(data, model);
@@ -64,7 +77,10 @@ public class UIEnhancer {
         }
     }
 
-    public static void setTextFieldPlaceholder(JTextField textField, String placeholderText) {
+    public static void setTextFieldPlaceholder(
+            JTextField textField,
+            String placeholderText
+    ) {
         // 存储占位符文本
         textField.putClientProperty("placeholderText", placeholderText);
         textField.putClientProperty("isPlaceholder", true);
@@ -75,27 +91,37 @@ public class UIEnhancer {
             updateForeground(textField);
         });
 
-        textField.addFocusListener(new FocusListener() {
-            @Override
-            public void focusGained(FocusEvent e) {
-                if (Boolean.TRUE.equals(textField.getClientProperty("isPlaceholder"))) {
-                    textField.putClientProperty("isPlaceholder", false);
-                    updateForeground(textField);
+        textField.addFocusListener(
+                new FocusListener() {
+                    @Override
+                    public void focusGained(FocusEvent e) {
+                        if (
+                                Boolean.TRUE.equals(
+                                        textField.getClientProperty("isPlaceholder")
+                                )
+                        ) {
+                            textField.putClientProperty("isPlaceholder", false);
+                            updateForeground(textField);
 
-                    textField.setText("");
-                }
-            }
+                            textField.setText("");
+                        }
+                    }
 
-            @Override
-            public void focusLost(FocusEvent e) {
-                if (textField.getText().isEmpty()) {
-                    updatePlaceholderText(textField);
+                    @Override
+                    public void focusLost(FocusEvent e) {
+                        if (textField.getText().isEmpty()) {
+                            updatePlaceholderText(textField);
+                        }
+                    }
                 }
-            }
-        });
+        );
 
         textField.addPropertyChangeListener("text", evt -> {
-            if (Boolean.TRUE.equals(textField.getClientProperty("isPlaceholder"))) {
+            if (
+                    Boolean.TRUE.equals(
+                            textField.getClientProperty("isPlaceholder")
+                    )
+            ) {
                 if (!textField.getText().isEmpty()) {
                     textField.putClientProperty("isPlaceholder", false);
                     updateForeground(textField);
@@ -109,7 +135,9 @@ public class UIEnhancer {
     }
 
     private static void updatePlaceholderText(JTextField textField) {
-        String placeholderText = (String) textField.getClientProperty("placeholderText");
+        String placeholderText = (String) textField.getClientProperty(
+                "placeholderText"
+        );
         textField.putClientProperty("isPlaceholder", true);
         textField.setText(placeholderText);
         textField.setForeground(Color.GRAY);
@@ -119,16 +147,19 @@ public class UIEnhancer {
         Color bg = textField.getBackground();
         Color fg = isDarkColor(bg) ? Color.WHITE : Color.BLACK;
 
-        if (!Boolean.TRUE.equals(textField.getClientProperty("isPlaceholder"))) {
+        if (
+                !Boolean.TRUE.equals(textField.getClientProperty("isPlaceholder"))
+        ) {
             textField.setForeground(fg);
             textField.putClientProperty("isPlaceholder", false);
         }
     }
 
     public static boolean isDarkColor(Color color) {
-        double brightness = 0.299 * color.getRed()
-                + 0.587 * color.getGreen()
-                + 0.114 * color.getBlue();
+        double brightness =
+                0.299 * color.getRed() +
+                        0.587 * color.getGreen() +
+                        0.114 * color.getBlue();
         return brightness < 128;
     }
 
@@ -137,26 +168,38 @@ public class UIEnhancer {
         return prop instanceof Boolean && !((Boolean) prop);
     }
 
-    public static void addSimpleDocumentListener(JTextField field, Runnable action) {
-        field.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                action.run();
-            }
+    public static void addSimpleDocumentListener(
+            JTextField field,
+            Runnable action
+    ) {
+        field
+                .getDocument()
+                .addDocumentListener(
+                        new DocumentListener() {
+                            @Override
+                            public void insertUpdate(DocumentEvent e) {
+                                action.run();
+                            }
 
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                action.run();
-            }
+                            @Override
+                            public void removeUpdate(DocumentEvent e) {
+                                action.run();
+                            }
 
-            @Override
-            public void changedUpdate(DocumentEvent e) {
-                action.run();
-            }
-        });
+                            @Override
+                            public void changedUpdate(DocumentEvent e) {
+                                action.run();
+                            }
+                        }
+                );
     }
 
-    public static void addDataToTable(String data, DefaultTableModel model, boolean parseKeyValue, Function<String, String> valueDecoder) {
+    public static void addDataToTable(
+            String data,
+            DefaultTableModel model,
+            boolean parseKeyValue,
+            Function<String, String> valueDecoder
+    ) {
         if (data.isBlank()) {
             return;
         }
@@ -165,7 +208,10 @@ public class UIEnhancer {
         for (String row : rows) {
             String[] cellData;
             if (parseKeyValue && row.contains("=")) {
-                cellData = new String[]{row.split("=")[0], valueDecoder.apply(row.split("=")[1])};
+                cellData = new String[]{
+                        row.split("=")[0],
+                        valueDecoder.apply(row.split("=")[1]),
+                };
             } else {
                 cellData = new String[]{row};
             }
@@ -173,5 +219,73 @@ public class UIEnhancer {
         }
 
         deduplicateTableData(model);
+    }
+
+    public static JPanel createButtonColumn(JButton... buttons) {
+        JPanel panel = new JPanel();
+        panel.setBorder(new javax.swing.border.EmptyBorder(0, 3, 0, 0));
+        GridBagLayout layout = new GridBagLayout();
+        int count = buttons.length + 1;
+        layout.rowHeights = new int[count];
+        double[] weights = new double[count];
+        weights[count - 1] = Double.MIN_VALUE;
+        layout.rowWeights = weights;
+        panel.setLayout(layout);
+
+        GridBagConstraints c = new GridBagConstraints();
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.weightx = 1.0;
+        c.gridx = 0;
+        c.insets = new Insets(0, 0, 0, 0);
+
+        for (int i = 0; i < buttons.length; i++) {
+            c.gridy = i;
+            panel.add(buttons[i], c);
+        }
+
+        return panel;
+    }
+
+    public static void setContainerEnabled(
+            Container container,
+            boolean enabled
+    ) {
+        for (Component comp : container.getComponents()) {
+            comp.setEnabled(enabled);
+            if (comp instanceof Container) {
+                setContainerEnabled((Container) comp, enabled);
+            }
+        }
+    }
+
+    public static void bindAddAction(
+            JButton addButton,
+            JTextField inputField,
+            DefaultTableModel model,
+            BiConsumer<String, DefaultTableModel> addDataToTable
+    ) {
+        addButton.addActionListener(e -> {
+            if (hasUserInput(inputField)) {
+                addDataToTable.accept(inputField.getText(), model);
+                inputField.setText("");
+                inputField.requestFocusInWindow();
+            }
+        });
+
+        inputField.addKeyListener(
+                new KeyAdapter() {
+                    @Override
+                    public void keyPressed(KeyEvent e) {
+                        if (
+                                e.getKeyCode() == KeyEvent.VK_ENTER &&
+                                        hasUserInput(inputField)
+                        ) {
+                            addDataToTable.accept(inputField.getText(), model);
+                            inputField.setText("");
+                            inputField.requestFocusInWindow();
+                        }
+                    }
+                }
+        );
     }
 }

@@ -257,7 +257,7 @@ public class Config extends JPanel {
 
     private void addActionPerformed(ActionEvent e, DefaultTableModel model, JTextField addTextField) {
         String addTextFieldText = addTextField.getText();
-        if (addTextField.getForeground().equals(Color.BLACK)) {
+        if (UIEnhancer.hasUserInput(addTextField)) {
             addDataToTable(addTextFieldText, model);
             addTextField.setText("");
             addTextField.requestFocusInWindow();

@@ -6,4 +6,6 @@ import caa.component.generator.Generator;
 import caa.instances.Database;
 import caa.utils.ConfigLoader;
 
-public record DatatableContext(MontoyaApi api, Database db, ConfigLoader configLoader, Generator generator, HttpRequest httpRequest) {}
+public record DatatableContext(MontoyaApi api, Database db, ConfigLoader configLoader, Generator generator,
+                               HttpRequest httpRequest) {
+}

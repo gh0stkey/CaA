@@ -9,6 +9,7 @@ import java.awt.*;
 import java.awt.event.*;
 
 public class Generator extends JTabbedPane {
+
     private final MontoyaApi api;
     private final ConfigLoader configLoader;
 
@@ -61,59 +62,71 @@ public class Generator extends JTabbedPane {
         deleteMenuItem.addActionListener(this::deleteTabActionPerformed);
 
         tabNameTextField.setBorder(BorderFactory.createEmptyBorder());
-        tabNameTextField.addFocusListener(new FocusAdapter() {
-            @Override
-            public void focusLost(FocusEvent e) {
-                renameTitleActionPerformed.actionPerformed(null);
-            }
-        });
-
-        addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-                int index = indexAtLocation(e.getX(), e.getY());
-                if (index < 0) {
-                    return;
+        tabNameTextField.addFocusListener(
+                new FocusAdapter() {
+                    @Override
+                    public void focusLost(FocusEvent e) {
+                        renameTitleActionPerformed.actionPerformed(null);
+                    }
                 }
+        );
 
-                switch (e.getButton()) {
-                    case MouseEvent.BUTTON1:
-                        if (e.getClickCount() == 2) {
-                            selectedIndex = index;
-                            tabComponent = getTabComponentAt(selectedIndex);
-                            String tabName = getTitleAt(selectedIndex);
+        addMouseListener(
+                new MouseAdapter() {
+                    @Override
+                    public void mousePressed(MouseEvent e) {
+                        int index = indexAtLocation(e.getX(), e.getY());
+                        if (index < 0) {
+                            return;
+                        }
 
-                            if (!"...".equals(tabName)) {
-                                setTabComponentAt(selectedIndex, tabNameTextField);
-                                tabNameTextField.setVisible(true);
-                                tabNameTextField.setText(tabName);
-                                tabNameTextField.selectAll();
-                                tabNameTextField.requestFocusInWindow();
-                                tabNameTextField.setMinimumSize(tabNameTextField.getPreferredSize());
-                            }
-                        } else if (e.getClickCount() == 1) {
-                            String title = getTitleAt(index);
-                            if ("...".equals(title)) {
-                                // 阻止默认的选中行为
-                                e.consume();
-                                // 直接创建新标签
-                                insertNewTab();
-                            } else {
-                                renameTitleActionPerformed.actionPerformed(null);
-                            }
+                        switch (e.getButton()) {
+                            case MouseEvent.BUTTON1:
+                                if (e.getClickCount() == 2) {
+                                    selectedIndex = index;
+                                    tabComponent = getTabComponentAt(selectedIndex);
+                                    String tabName = getTitleAt(selectedIndex);
+
+                                    if (!"...".equals(tabName)) {
+                                        setTabComponentAt(
+                                                selectedIndex,
+                                                tabNameTextField
+                                        );
+                                        tabNameTextField.setVisible(true);
+                                        tabNameTextField.setText(tabName);
+                                        tabNameTextField.selectAll();
+                                        tabNameTextField.requestFocusInWindow();
+                                        tabNameTextField.setMinimumSize(
+                                                tabNameTextField.getPreferredSize()
+                                        );
+                                    }
+                                } else if (e.getClickCount() == 1) {
+                                    String title = getTitleAt(index);
+                                    if ("...".equals(title)) {
+                                        e.consume();
+                                        insertNewTab();
+                                    } else {
+                                        renameTitleActionPerformed.actionPerformed(
+                                                null
+                                        );
+                                    }
+                                }
+                                break;
+                            case MouseEvent.BUTTON3:
+                                if (!"...".equals(getTitleAt(index))) {
+                                    popupMenu.show(
+                                            e.getComponent(),
+                                            e.getX(),
+                                            e.getY()
+                                    );
+                                }
+                                break;
+                            default:
+                                break;
                         }
-                        break;
-                    case MouseEvent.BUTTON3:
-                        if (!"...".equals(getTitleAt(index))) {
-                            popupMenu.show(e.getComponent(), e.getX(), e.getY());
-                        }
-                        break;
-                    default:
-                        break;
+                    }
                 }
-            }
-        });
-
+        );
 
         InputMap im = tabNameTextField.getInputMap(JComponent.WHEN_FOCUSED);
         ActionMap am = tabNameTextField.getActionMap();
@@ -123,22 +136,60 @@ public class Generator extends JTabbedPane {
         am.put("rename", renameTitleActionPerformed);
     }
 
+    private static final java.util.Set<String> ENDPOINT_TYPES =
+            java.util.Set.of("FullPath", "Path", "File");
+
     private void insertNewTab() {
-        insertTab(String.valueOf(newTabIndex), null, new Tab(api, configLoader, HttpRequest.httpRequestFromUrl("http://localhost:80"), "Param", "id"), null, getTabCount() - 1);
+        insertTab(
+                String.valueOf(newTabIndex),
+                null,
+                new Tab(
+                        api,
+                        configLoader,
+                        HttpRequest.httpRequestFromUrl("http://localhost:80"),
+                        "Param",
+                        "",
+                        false
+                ),
+                null,
+                getTabCount() - 1
+        );
         setSelectedIndex(getTabCount() - 2);
         newTabIndex++;
     }
 
-    public void insertNewTab(HttpRequest request, String payloadType, String payloads) {
-        insertTab(String.valueOf(newTabIndex), null, new Tab(api, configLoader, request, payloadType, payloads), null, getTabCount() - 1);
+    public void insertNewTab(
+            HttpRequest request,
+            String payloadType,
+            String payloads
+    ) {
+        boolean isEndpoint = ENDPOINT_TYPES.contains(payloadType);
+        insertTab(
+                String.valueOf(newTabIndex),
+                null,
+                new Tab(
+                        api,
+                        configLoader,
+                        request,
+                        payloadType,
+                        payloads,
+                        isEndpoint
+                ),
+                null,
+                getTabCount() - 1
+        );
         setSelectedIndex(getTabCount() - 2);
         newTabIndex++;
     }
 
     private void deleteTabActionPerformed(ActionEvent e) {
         if (getTabCount() > 2) {
-            int retCode = JOptionPane.showConfirmDialog(this, "Do you want to delete this tab?", "Info",
-                    JOptionPane.YES_NO_OPTION);
+            int retCode = JOptionPane.showConfirmDialog(
+                    this,
+                    "Do you want to delete this tab?",
+                    "Info",
+                    JOptionPane.YES_NO_OPTION
+            );
             if (retCode == JOptionPane.YES_OPTION) {
                 remove(getSelectedIndex());
                 setSelectedIndex(getSelectedIndex() - 1);
@@ -146,7 +197,3 @@ public class Generator extends JTabbedPane {
         }
     }
 }
-
-
-
-

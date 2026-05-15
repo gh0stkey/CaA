@@ -1,5 +1,10 @@
 package caa.instances;
 
+import static burp.api.montoya.scanner.AuditResult.auditResult;
+import static burp.api.montoya.scanner.ConsolidationAction.KEEP_BOTH;
+import static burp.api.montoya.scanner.ConsolidationAction.KEEP_EXISTING;
+import static java.util.Collections.emptyList;
+
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.core.ByteArray;
 import burp.api.montoya.http.message.HttpRequestResponse;
@@ -19,22 +24,17 @@ import caa.utils.JsonTraverser;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
 import com.google.gson.JsonParser;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-
-import static burp.api.montoya.scanner.AuditResult.auditResult;
-import static burp.api.montoya.scanner.ConsolidationAction.KEEP_BOTH;
-import static burp.api.montoya.scanner.ConsolidationAction.KEEP_EXISTING;
-import static java.util.Collections.emptyList;
-
 public class Collector implements ScanCheck {
+
     private final MontoyaApi api;
     private final Database db;
     private final ConfigLoader configLoader;
@@ -48,7 +48,9 @@ public class Collector implements ScanCheck {
     }
 
     public static Map<String, Object> getJsonData(String responseBody) {
-        String hashIndex = HashCalculator.calculateHash(responseBody.getBytes());
+        String hashIndex = HashCalculator.calculateHash(
+            responseBody.getBytes()
+        );
         Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
 
         if (cachePool != null) {
@@ -57,9 +59,13 @@ public class Collector implements ScanCheck {
             // 遍历JSON Keys
             try {
                 JsonTraverser jsonTraverser = new JsonTraverser();
-                jsonTraverser.foreachJsonKey(JsonParser.parseString(responseBody).getAsJsonObject());
+                jsonTraverser.foreachJsonKey(
+                    JsonParser.parseString(responseBody)
+                );
 
-                Map<String, Object> collectMap = getJsonObjectMap(jsonTraverser);
+                Map<String, Object> collectMap = getJsonObjectMap(
+                    jsonTraverser
+                );
 
                 if (!collectMap.isEmpty()) {
                     CachePool.addToCache(hashIndex, collectMap);
@@ -67,17 +73,21 @@ public class Collector implements ScanCheck {
                 } else {
                     return null;
                 }
-
             } catch (Exception e) {
                 return null;
             }
         }
     }
 
-    private static Map<String, Object> getJsonObjectMap(JsonTraverser jsonTraverser) {
+    private static Map<String, Object> getJsonObjectMap(
+        JsonTraverser jsonTraverser
+    ) {
         Map<String, Object> collectMap = new HashMap<>();
-        Set<String> paramList = new LinkedHashSet<>(jsonTraverser.getJsonKeys());
-        SetMultimap<String, String> paramValueMap = jsonTraverser.getJsonKeyValues();
+        Set<String> paramList = new LinkedHashSet<>(
+            jsonTraverser.getJsonKeys()
+        );
+        SetMultimap<String, String> paramValueMap =
+            jsonTraverser.getJsonKeyValues();
 
         if (paramValueMap != null && !paramValueMap.isEmpty()) {
             collectMap.put("jsonKeyValue", paramValueMap);
@@ -91,7 +101,10 @@ public class Collector implements ScanCheck {
     }
 
     @Override
-    public AuditResult activeAudit(HttpRequestResponse baseRequestResponse, AuditInsertionPoint auditInsertionPoint) {
+    public AuditResult activeAudit(
+        HttpRequestResponse baseRequestResponse,
+        AuditInsertionPoint auditInsertionPoint
+    ) {
         return auditResult(emptyList());
     }
 
@@ -106,7 +119,7 @@ public class Collector implements ScanCheck {
 
         HttpRequest request = baseRequestResponse.request();
         HttpResponse response = baseRequestResponse.response();
-        
+
         if (request != null) {
             String path = "";
             String host = "";
@@ -115,10 +128,15 @@ public class Collector implements ScanCheck {
                 path = u.getPath().replaceAll("/+", "/");
                 host = u.getHost();
             } catch (Exception e) {
-                api.logging().logToError("Failed to parse URL: " + e.getMessage());
+                api
+                    .logging()
+                    .logToError("Failed to parse URL: " + e.getMessage());
             }
 
-            boolean matches = httpUtils.verifyHttpRequestResponse(baseRequestResponse, "Proxy");
+            boolean matches = httpUtils.verifyHttpRequestResponse(
+                baseRequestResponse,
+                "Proxy"
+            );
             if (!matches) {
                 // 处理请求路径
                 processPath(path, pathList, fileList, fullPathList);
@@ -158,7 +176,12 @@ public class Collector implements ScanCheck {
                             db.insertData(finalHost, collectMap);
                             return null;
                         }).exceptionally(ex -> {
-                            api.logging().logToError("Failed to insert data asynchronously: " + ex.getMessage());
+                            api
+                                .logging()
+                                .logToError(
+                                    "Failed to insert data asynchronously: " +
+                                        ex.getMessage()
+                                );
                             return null;
                         });
                     }
@@ -174,7 +197,11 @@ public class Collector implements ScanCheck {
         return auditResult(emptyList());
     }
 
-    private void processJsonData(Map<String, Object> jsonData, SetMultimap<String, String> valueList, Set<String> paramList) {
+    private void processJsonData(
+        Map<String, Object> jsonData,
+        SetMultimap<String, String> valueList,
+        Set<String> paramList
+    ) {
         Object jsonKeyValue = jsonData.get("jsonKeyValue");
         Object jsonKey = jsonData.get("jsonKey");
         if (jsonKeyValue != null) {
@@ -185,27 +212,45 @@ public class Collector implements ScanCheck {
         }
     }
 
-    private void processPath(String path, Set<String> pathList, Set<String> fileList, Set<String> fullPathList) {
+    private void processPath(
+        String path,
+        Set<String> pathList,
+        Set<String> fileList,
+        Set<String> fullPathList
+    ) {
         if ("/".equals(path)) {
             return;
         }
-        Arrays.stream(path.split("/")).filter(p -> !p.isBlank()).forEach(p -> {
-            if (p.contains(".") && !p.equals(".") && p.indexOf(".") != p.length() - 1) {
-                if (fileList != null) {
-                    fileList.add(p);
+        Arrays.stream(path.split("/"))
+            .filter(p -> !p.isBlank())
+            .forEach(p -> {
+                if (
+                    p.contains(".") &&
+                    !p.equals(".") &&
+                    p.indexOf(".") != p.length() - 1
+                ) {
+                    if (fileList != null) {
+                        fileList.add(p);
+                    }
+                } else {
+                    pathList.add(p.replaceAll(":", ""));
                 }
-            } else {
-                pathList.add(p.replaceAll(":", ""));
-            }
-        });
+            });
         if (fullPathList != null) {
             fullPathList.add(path);
         }
     }
 
-    private void processParameters(List<ParsedHttpParameter> paramsList, Set<String> paramList, SetMultimap<String, String> valueList) {
+    private void processParameters(
+        List<ParsedHttpParameter> paramsList,
+        Set<String> paramList,
+        SetMultimap<String, String> valueList
+    ) {
         for (ParsedHttpParameter param : paramsList) {
-            String paramName = httpUtils.decodeParameter(param.name()).trim().replaceAll("\\?", "");
+            String paramName = httpUtils
+                .decodeParameter(param.name())
+                .trim()
+                .replaceAll("\\?", "");
             if ("_".equals(paramName)) {
                 paramName = paramName.replace("_", "");
             }
@@ -224,8 +269,14 @@ public class Collector implements ScanCheck {
         }
     }
 
-    private boolean processResponseBodyJson(ByteArray responseBodyBytes, Set<String> paramList, SetMultimap<String, String> valueList) {
-        String hashIndex = HashCalculator.calculateHash(responseBodyBytes.getBytes());
+    private boolean processResponseBodyJson(
+        ByteArray responseBodyBytes,
+        Set<String> paramList,
+        SetMultimap<String, String> valueList
+    ) {
+        String hashIndex = HashCalculator.calculateHash(
+            responseBodyBytes.getBytes()
+        );
         Map<String, Object> cachePool = CachePool.getFromCache(hashIndex);
 
         if (cachePool != null) {
@@ -234,7 +285,10 @@ public class Collector implements ScanCheck {
         }
 
         try {
-            String responseBody = new String(responseBodyBytes.getBytes(), StandardCharsets.UTF_8);
+            String responseBody = new String(
+                responseBodyBytes.getBytes(),
+                StandardCharsets.UTF_8
+            );
             Map<String, Object> jsonData = getJsonData(responseBody);
             if (jsonData != null) {
                 processJsonData(jsonData, valueList, paramList);
@@ -242,24 +296,43 @@ public class Collector implements ScanCheck {
                 return true;
             }
         } catch (Exception e) {
-            api.logging().logToError("Failed to parse response body JSON: " + e.getMessage());
+            api
+                .logging()
+                .logToError(
+                    "Failed to parse response body JSON: " + e.getMessage()
+                );
         }
 
         return false;
     }
 
-    private void processResponseBody(ByteArray responseBodyBytes, Set<String> paramList, SetMultimap<String, String> valueList) {
+    private void processResponseBody(
+        ByteArray responseBodyBytes,
+        Set<String> paramList,
+        SetMultimap<String, String> valueList
+    ) {
         if (!processResponseBodyJson(responseBodyBytes, paramList, valueList)) {
             try {
-                String responseBody = new String(responseBodyBytes.getBytes(), StandardCharsets.UTF_8);
+                String responseBody = new String(
+                    responseBodyBytes.getBytes(),
+                    StandardCharsets.UTF_8
+                );
                 processHtmlInputs(responseBody, paramList, valueList);
             } catch (Exception e) {
-                api.logging().logToError("Failed to parse response body HTML: " + e.getMessage());
+                api
+                    .logging()
+                    .logToError(
+                        "Failed to parse response body HTML: " + e.getMessage()
+                    );
             }
         }
     }
 
-    private void processHtmlInputs(String html, Set<String> paramList, SetMultimap<String, String> valueList) {
+    private void processHtmlInputs(
+        String html,
+        Set<String> paramList,
+        SetMultimap<String, String> valueList
+    ) {
         try {
             Document doc = Jsoup.parse(html);
             Elements inputTags = doc.getElementsByTag("input");
@@ -285,13 +358,19 @@ public class Collector implements ScanCheck {
         }
     }
 
-    private void processResponseOnly(HttpResponse response, SetMultimap<String, String> valueList, Set<String> paramList) {
+    private void processResponseOnly(
+        HttpResponse response,
+        SetMultimap<String, String> valueList,
+        Set<String> paramList
+    ) {
         if (response != null) {
             processResponseBodyJson(response.body(), paramList, valueList);
         }
     }
 
-    public Map<String, Object> collect(HttpRequestResponse baseRequestResponse) {
+    public Map<String, Object> collect(
+        HttpRequestResponse baseRequestResponse
+    ) {
         Map<String, Object> resultMap = new HashMap<>();
         Set<String> pathList = new HashSet<>();
         Set<String> paramList = new HashSet<>();
@@ -306,10 +385,17 @@ public class Collector implements ScanCheck {
                 URL u = new URL(request.url());
                 path = u.getPath().replaceAll("/+", "/");
             } catch (Exception e) {
-                api.logging().logToError("Failed to parse URL in collect: " + e.getMessage());
+                api
+                    .logging()
+                    .logToError(
+                        "Failed to parse URL in collect: " + e.getMessage()
+                    );
             }
 
-            boolean matches = httpUtils.verifyHttpRequestResponse(baseRequestResponse, "Proxy");
+            boolean matches = httpUtils.verifyHttpRequestResponse(
+                baseRequestResponse,
+                "Proxy"
+            );
             if (!matches) {
                 // 处理路径（不收集文件和全路径）
                 processPath(path, pathList, null, null);
@@ -319,7 +405,11 @@ public class Collector implements ScanCheck {
 
                 // 处理响应数据（只解析JSON，不解析HTML）
                 if (response != null) {
-                    processResponseBodyJson(response.body(), paramList, valueList);
+                    processResponseBodyJson(
+                        response.body(),
+                        paramList,
+                        valueList
+                    );
                 }
             }
         }
@@ -344,7 +434,12 @@ public class Collector implements ScanCheck {
     }
 
     @Override
-    public ConsolidationAction consolidateIssues(AuditIssue newIssue, AuditIssue existingIssue) {
-        return existingIssue.name().equals(newIssue.name()) ? KEEP_EXISTING : KEEP_BOTH;
+    public ConsolidationAction consolidateIssues(
+        AuditIssue newIssue,
+        AuditIssue existingIssue
+    ) {
+        return existingIssue.name().equals(newIssue.name())
+            ? KEEP_EXISTING
+            : KEEP_BOTH;
     }
 }

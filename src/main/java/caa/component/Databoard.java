@@ -10,8 +10,6 @@ import caa.instances.Database;
 import caa.utils.ConfigLoader;
 import caa.utils.HttpUtils;
 import caa.utils.UIEnhancer;
-
-import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -19,8 +17,10 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.util.*;
 import java.util.List;
+import javax.swing.*;
 
 public class Databoard extends JPanel {
+
     private boolean isMatchHost = false;
 
     private final MontoyaApi api;
@@ -28,9 +28,10 @@ public class Databoard extends JPanel {
     private final ConfigLoader configLoader;
     private final Generator generator;
     private final String defaultText = "Please enter the host";
-    private final DefaultComboBoxModel comboBoxModel = new DefaultComboBoxModel();
+    private final DefaultComboBoxModel comboBoxModel =
+        new DefaultComboBoxModel();
     private final JComboBox hostComboBox = new JComboBox(comboBoxModel);
-    private volatile Map<String, List<String>> hostCache = new HashMap<>();
+
     private JTextField hostTextField;
     private JComboBox<String> tableComboBox;
     private JComboBox<String> limitComboBox;
@@ -47,7 +48,7 @@ public class Databoard extends JPanel {
                 return;
             }
             String selected = selectedItem.toString();
-            
+
             // 立即清空面板并刷新UI，防止旧数据停留
             dataPanel.removeAll();
             dataPanel.revalidate();
@@ -63,7 +64,9 @@ public class Databoard extends JPanel {
                     if (host.equals("*")) {
                         hostTextField.setText("");
                         hostTextField.setForeground(Color.BLACK);
-                    } else if (hostTextField.getForeground().equals(Color.BLACK)) {
+                    } else if (
+                        hostTextField.getForeground().equals(Color.BLACK)
+                    ) {
                         handleComboBoxAction(null, host);
                     }
                 }
@@ -71,24 +74,43 @@ public class Databoard extends JPanel {
         }
     };
 
-    public Databoard(MontoyaApi api, Database db, ConfigLoader configLoader, Generator generator) {
+    public Databoard(
+        MontoyaApi api,
+        Database db,
+        ConfigLoader configLoader,
+        Generator generator
+    ) {
         this.api = api;
         this.db = db;
         this.configLoader = configLoader;
         this.generator = generator;
-
-        // 注册缓存失效回调，当数据库插入数据时自动清空缓存
-        db.setCacheInvalidationCallback(this::clearHostCache);
 
         initComponents();
     }
 
     private void initComponents() {
         setLayout(new GridBagLayout());
-        ((GridBagLayout) getLayout()).columnWidths = new int[]{10, 0, 0, 20, 0};
-        ((GridBagLayout) getLayout()).rowHeights = new int[]{0, 65, 20, 0};
-        ((GridBagLayout) getLayout()).columnWeights = new double[]{0.0, 0.0, 1.0, 0.0, 1.0E-4};
-        ((GridBagLayout) getLayout()).rowWeights = new double[]{0.0, 1.0, 0.0, 1.0E-4};
+        ((GridBagLayout) getLayout()).columnWidths = new int[] {
+            10,
+            0,
+            0,
+            20,
+            0,
+        };
+        ((GridBagLayout) getLayout()).rowHeights = new int[] { 0, 65, 20, 0 };
+        ((GridBagLayout) getLayout()).columnWeights = new double[] {
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            1.0E-4,
+        };
+        ((GridBagLayout) getLayout()).rowWeights = new double[] {
+            0.0,
+            1.0,
+            0.0,
+            1.0E-4,
+        };
 
         tableComboBox = new JComboBox<>();
         tableComboBox.setModel(new DefaultComboBoxModel<>(Config.CaATableName));
@@ -96,12 +118,11 @@ public class Databoard extends JPanel {
         hostComboBox.setMaximumRowCount(5);
 
         limitComboBox = new JComboBox<>();
-        limitComboBox.setModel(new DefaultComboBoxModel<>(new String[]{
-                "100",
-                "1000",
-                "10000",
-                "100000"
-        }));
+        limitComboBox.setModel(
+            new DefaultComboBoxModel<>(
+                new String[] { "100", "1000", "10000", "100000" }
+            )
+        );
 
         // 添加选项监听器
         tableComboBox.addActionListener(actionListener);
@@ -116,12 +137,87 @@ public class Databoard extends JPanel {
         dataPanel = new JPanel();
         dataPanel.setLayout(new BorderLayout());
 
-        add(tableComboBox, new GridBagConstraints(1, 0, 1, 1, 0.0, 0.0, GridBagConstraints.CENTER, GridBagConstraints.BOTH, new Insets(8, 0, 5, 5), 0, 0));
-        add(hostTextField, new GridBagConstraints(2, 0, 1, 1, 0.0, 0.0, GridBagConstraints.CENTER, GridBagConstraints.BOTH, new Insets(8, 0, 5, 5), 0, 0));
-        add(limitComboBox, new GridBagConstraints(3, 0, 1, 1, 0.0, 0.0, GridBagConstraints.CENTER, GridBagConstraints.BOTH, new Insets(8, 0, 5, 5), 0, 0));
-        add(dataPanel, new GridBagConstraints(1, 1, 4, 3, 1.0, 1.0, GridBagConstraints.CENTER, GridBagConstraints.BOTH, new Insets(8, 0, 5, 5), 0, 0));
+        add(
+            tableComboBox,
+            new GridBagConstraints(
+                1,
+                0,
+                1,
+                1,
+                0.0,
+                0.0,
+                GridBagConstraints.CENTER,
+                GridBagConstraints.BOTH,
+                new Insets(8, 0, 5, 5),
+                0,
+                0
+            )
+        );
+        add(
+            hostTextField,
+            new GridBagConstraints(
+                2,
+                0,
+                1,
+                1,
+                0.0,
+                0.0,
+                GridBagConstraints.CENTER,
+                GridBagConstraints.BOTH,
+                new Insets(8, 0, 5, 5),
+                0,
+                0
+            )
+        );
+        add(
+            limitComboBox,
+            new GridBagConstraints(
+                3,
+                0,
+                1,
+                1,
+                0.0,
+                0.0,
+                GridBagConstraints.CENTER,
+                GridBagConstraints.BOTH,
+                new Insets(8, 0, 5, 5),
+                0,
+                0
+            )
+        );
+        add(
+            dataPanel,
+            new GridBagConstraints(
+                1,
+                1,
+                4,
+                3,
+                1.0,
+                1.0,
+                GridBagConstraints.CENTER,
+                GridBagConstraints.BOTH,
+                new Insets(8, 0, 5, 5),
+                0,
+                0
+            )
+        );
 
-        add(hostComboBox, new GridBagConstraints(2, 0, 1, 1, 0.0, 0.0, GridBagConstraints.CENTER, GridBagConstraints.BOTH, new Insets(8, 0, 5, 5), 0, 0));
+        add(
+            hostComboBox,
+            new GridBagConstraints(
+                2,
+                0,
+                1,
+                1,
+                0.0,
+                0.0,
+                GridBagConstraints.CENTER,
+                GridBagConstraints.BOTH,
+                new Insets(8, 0, 5, 5),
+                0,
+                0
+            )
+        );
 
         setAutoMatch();
     }
@@ -130,14 +226,19 @@ public class Databoard extends JPanel {
         hostComboBox.setSelectedItem(null);
         hostComboBox.addActionListener(e -> handleComboBoxAction(e, ""));
 
-        hostTextField.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                handleKeyEvents(e);
+        hostTextField.addKeyListener(
+            new KeyAdapter() {
+                @Override
+                public void keyPressed(KeyEvent e) {
+                    handleKeyEvents(e);
+                }
             }
-        });
+        );
 
-        UIEnhancer.addSimpleDocumentListener(hostTextField, this::filterComboBoxList);
+        UIEnhancer.addSimpleDocumentListener(
+            hostTextField,
+            this::filterComboBoxList
+        );
     }
 
     private void filterComboBoxList() {
@@ -188,20 +289,31 @@ public class Databoard extends JPanel {
 
             if (host.equals("*")) {
                 selectedHost = "*";
-            } else if (selectedItem != null && getHostByList(tableName, selectedItem.toString()).contains(selectedItem.toString())) {
+            } else if (
+                selectedItem != null &&
+                getHostByList(tableName, selectedItem.toString()).contains(
+                    selectedItem.toString()
+                )
+            ) {
                 selectedHost = selectedItem.toString();
             } else {
                 selectedHost = "";
             }
 
             if (!selectedHost.isBlank() || selectedHost.equals("*")) {
-                if (handleComboBoxWorker != null && !handleComboBoxWorker.isDone()) {
+                if (
+                    handleComboBoxWorker != null &&
+                    !handleComboBoxWorker.isDone()
+                ) {
                     handleComboBoxWorker.cancel(true);
                 }
 
                 // 立即显示加载提示
                 dataPanel.removeAll();
-                JLabel loadingLabel = new JLabel("Loading...", SwingConstants.CENTER);
+                JLabel loadingLabel = new JLabel(
+                    "Loading...",
+                    SwingConstants.CENTER
+                );
                 loadingLabel.setForeground(Color.GRAY);
                 dataPanel.add(loadingLabel, BorderLayout.CENTER);
                 dataPanel.revalidate();
@@ -210,8 +322,14 @@ public class Databoard extends JPanel {
                 handleComboBoxWorker = new SwingWorker<Object, Void>() {
                     @Override
                     protected Object doInBackground() {
-                        String limitSize = limitComboBox.getSelectedItem().toString();
-                        return db.selectData(selectedHost.equals("*") ? "" : selectedHost, tableName, limitSize);
+                        String limitSize = limitComboBox
+                            .getSelectedItem()
+                            .toString();
+                        return db.selectData(
+                            selectedHost.equals("*") ? "" : selectedHost,
+                            tableName,
+                            limitSize
+                        );
                     }
 
                     @Override
@@ -219,45 +337,98 @@ public class Databoard extends JPanel {
                         if (!isCancelled()) {
                             try {
                                 Object selectedObject = get();
-                                
+
                                 dataPanel.removeAll();
-                                
+
                                 // 检查数据是否为空
                                 boolean hasData = false;
                                 if (selectedObject != null) {
                                     if (selectedObject instanceof Map) {
-                                        hasData = !((Map<?, ?>) selectedObject).isEmpty();
-                                    } else if (selectedObject instanceof com.google.common.collect.SetMultimap) {
-                                        hasData = !((com.google.common.collect.SetMultimap<?, ?>) selectedObject).isEmpty();
+                                        hasData = !(
+                                            (Map<?, ?>) selectedObject
+                                        ).isEmpty();
+                                    } else if (
+                                        selectedObject instanceof
+                                            com.google.common.collect.SetMultimap
+                                    ) {
+                                        hasData = !(
+                                            (com.google.common.collect.SetMultimap<
+                                                ?,
+                                                ?
+                                            >) selectedObject
+                                        ).isEmpty();
                                     }
                                 }
-                                
+
                                 if (hasData) {
                                     Datatable datatableComponent;
                                     if (tableName.equals("Value")) {
-                                        List<String> columnNameB = new ArrayList<>();
+                                        List<String> columnNameB =
+                                            new ArrayList<>();
                                         columnNameB.add("Name");
                                         columnNameB.add("Value");
                                         columnNameB.add("Count");
-                                        DatatableContext ctx = new DatatableContext(api, db, configLoader, generator, null);
-                                        datatableComponent = new Datatable(ctx, columnNameB, selectedObject, tableName, Mode.COUNT);
+                                        DatatableContext ctx =
+                                            new DatatableContext(
+                                                api,
+                                                db,
+                                                configLoader,
+                                                generator,
+                                                null
+                                            );
+                                        datatableComponent = new Datatable(
+                                            ctx,
+                                            columnNameB,
+                                            selectedObject,
+                                            tableName,
+                                            Mode.COUNT
+                                        );
                                     } else {
-                                        List<String> columnNameA = new ArrayList<>();
+                                        List<String> columnNameA =
+                                            new ArrayList<>();
                                         columnNameA.add("Name");
                                         columnNameA.add("Count");
-                                        DatatableContext ctx = new DatatableContext(api, db, configLoader, generator, null);
-                                        datatableComponent = new Datatable(ctx, columnNameA, selectedObject, tableName, Mode.COUNT);
+                                        DatatableContext ctx =
+                                            new DatatableContext(
+                                                api,
+                                                db,
+                                                configLoader,
+                                                generator,
+                                                null
+                                            );
+                                        datatableComponent = new Datatable(
+                                            ctx,
+                                            columnNameA,
+                                            selectedObject,
+                                            tableName,
+                                            Mode.COUNT
+                                        );
                                     }
                                     // 设置当前host，用于删除操作
-                                    datatableComponent.setCurrentHost(selectedHost.equals("*") ? "" : selectedHost);
-                                    dataPanel.add(datatableComponent, BorderLayout.CENTER);
+                                    datatableComponent.setCurrentHost(
+                                        selectedHost.equals("*")
+                                            ? ""
+                                            : selectedHost
+                                    );
+                                    dataPanel.add(
+                                        datatableComponent,
+                                        BorderLayout.CENTER
+                                    );
                                 } else {
-                                    JLabel noDataLabel = new JLabel("No data found", SwingConstants.CENTER);
+                                    JLabel noDataLabel = new JLabel(
+                                        "No data found",
+                                        SwingConstants.CENTER
+                                    );
                                     noDataLabel.setForeground(Color.GRAY);
-                                    noDataLabel.setFont(noDataLabel.getFont().deriveFont(14f));
-                                    dataPanel.add(noDataLabel, BorderLayout.CENTER);
+                                    noDataLabel.setFont(
+                                        noDataLabel.getFont().deriveFont(14f)
+                                    );
+                                    dataPanel.add(
+                                        noDataLabel,
+                                        BorderLayout.CENTER
+                                    );
                                 }
-                                
+
                                 dataPanel.revalidate();
                                 dataPanel.repaint();
 
@@ -266,9 +437,17 @@ public class Databoard extends JPanel {
                                 }
                                 hostComboBox.setPopupVisible(false);
                             } catch (Exception ex) {
-                                api.logging().logToError("Failed to process data panel: " + ex.getMessage());
+                                api
+                                    .logging()
+                                    .logToError(
+                                        "Failed to process data panel: " +
+                                            ex.getMessage()
+                                    );
                                 dataPanel.removeAll();
-                                JLabel errorLabel = new JLabel("Error loading data", SwingConstants.CENTER);
+                                JLabel errorLabel = new JLabel(
+                                    "Error loading data",
+                                    SwingConstants.CENTER
+                                );
                                 errorLabel.setForeground(Color.RED);
                                 dataPanel.add(errorLabel, BorderLayout.CENTER);
                                 dataPanel.revalidate();
@@ -284,18 +463,12 @@ public class Databoard extends JPanel {
     }
 
     private List<String> getHostByList(String tableName, String hostName) {
-        // 先从缓存中查找
-        if (hostCache.containsKey(tableName)) {
-            return hostCache.get(tableName);
-        }
-
-        // 缓存中没有，则查询数据库
         List<String> hosts = db.getAllHosts(tableName);
         if (hosts == null || hosts.isEmpty()) {
             return new ArrayList<>();
         }
 
-        // 使用Set进行去重，提高性能
+        // 使用Set进行去重
         Set<String> hostSet = new LinkedHashSet<>(hosts);
 
         // 添加通配符Host
@@ -304,7 +477,11 @@ public class Databoard extends JPanel {
             if (!HttpUtils.matchHostIsIp(host)) {
                 String[] splitHost = host.split("\\.");
                 if (splitHost.length > 2) {
-                    String anyHost = HttpUtils.replaceFirstOccurrence(host, splitHost[0], "*");
+                    String anyHost = HttpUtils.replaceFirstOccurrence(
+                        host,
+                        splitHost[0],
+                        "*"
+                    );
                     if (!anyHost.isEmpty() && !anyHost.equals(host)) {
                         wildcardHosts.add(anyHost);
                     }
@@ -315,10 +492,7 @@ public class Databoard extends JPanel {
         // 添加通配符主机
         hostSet.addAll(wildcardHosts);
 
-        // 转换为List并缓存
-        List<String> result = new ArrayList<>(hostSet);
-        hostCache.put(tableName, result);
-        return result;
+        return new ArrayList<>(hostSet);
     }
 
     private void handleKeyEvents(KeyEvent e) {
@@ -343,9 +517,5 @@ public class Databoard extends JPanel {
         }
 
         isMatchHost = false;
-    }
-    
-    public void clearHostCache() {
-        hostCache = new HashMap<>();
     }
 }
